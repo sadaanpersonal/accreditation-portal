@@ -270,6 +270,24 @@ document.addEventListener('touchstart', e => { _tx=e.touches[0].clientX; }, {pas
 document.addEventListener('touchend',   e => { if (e.changedTouches[0].clientX - _tx < -60) closeSidebar(); }, {passive:true});
 
 // ============================================================
+// Expose functions to global scope (required for inline onclick handlers)
+// ES modules are scoped — window assignment makes them accessible from HTML
+// ============================================================
+window.showScreen       = showScreen;
+window.switchAcc        = switchAcc;
+window.switchQrEvent    = switchQrEvent;
+window.showSubPage      = showSubPage;
+window.showAdminPage    = showAdminPage;
+window.openModal        = openModal;
+window.closeModal       = closeModal;
+window.toggleTheme      = toggleTheme;
+window.updatePwdStrength = updatePwdStrength;
+window.filterNotif      = filterNotif;
+window.markAllRead      = markAllRead;
+window.toggleSidebar    = toggleSidebar;
+window.closeSidebar     = closeSidebar;
+
+// ============================================================
 // Initialize
 // ============================================================
 window.addEventListener('DOMContentLoaded', () => {
