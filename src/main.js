@@ -150,15 +150,13 @@ function showSubPage(role, page) {
   if (target) target.style.display = 'block';
   document.querySelectorAll('#creator-dashboard .nav-item').forEach(n => n.classList.remove('active'));
   const titles = {
-    'dashboard': ['Dashboard','Welcome back, Hamad'],
-    'create':    ['New Request','Create accreditation request'],
-    'my-requests':['My Requests','Track your submissions']
+    'dashboard':   'Dashboard',
+    'create':      'New Request',
+    'my-requests': 'My Requests',
+    'events':      'Events',
   };
-  const t = titles[page] || ['Dashboard',''];
   const titleEl = document.getElementById('creator-page-title');
-  const subEl   = document.getElementById('creator-page-sub');
-  if (titleEl) titleEl.textContent = t[0];
-  if (subEl)   subEl.textContent   = t[1];
+  if (titleEl) titleEl.textContent = titles[page] || 'Dashboard';
 }
 
 // ============================================================

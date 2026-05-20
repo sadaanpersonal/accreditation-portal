@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,7 +23,7 @@
 ============================================================ -->
 <div class="demo-nav">
   <button class="demo-nav-btn" onclick="showScreen('login-creator')">Login</button>
-  <button class="demo-nav-btn active" onclick="showScreen('creator-dashboard')">Creator</button>
+  <button class="demo-nav-btn active" onclick="showScreen('creator-dashboard')">Requestor</button>
   <button class="demo-nav-btn" onclick="showScreen('admin-dashboard')">Admin</button>
   <button class="demo-nav-btn" onclick="showScreen('admin-request-detail')">Detail</button>
   <button class="demo-nav-btn" onclick="showScreen('user-activate')">Activate</button>
@@ -46,7 +46,7 @@
       <p class="subtitle">Sign in to your account to continue</p>
 
       <div style="display:flex; gap:8px; margin-bottom:28px;">
-        <button class="filter-pill active" style="flex:1; text-align:center; justify-content:center;">Request Creator</button>
+        <button class="filter-pill active" style="flex:1; text-align:center; justify-content:center;">Requestor</button>
         <button class="filter-pill" style="flex:1; text-align:center; justify-content:center;">End User</button>
       </div>
 
@@ -54,7 +54,7 @@
         <label>Email Address</label>
         <div class="form-control-icon">
           <span class="ms">mail</span>
-          <input type="email" class="form-control" placeholder="creator@qoc.gov.qa">
+          <input type="email" class="form-control" placeholder="requestor@qoc.gov.qa">
         </div>
       </div>
 
@@ -119,7 +119,7 @@
       </a>
 
       <div class="nav-section-label">Events</div>
-      <a class="nav-item" onclick="">
+      <a class="nav-item" onclick="showSubPage('creator', 'events')">
         <span class="ms">calendar_month</span> Events
       </a>
       <a class="nav-item" onclick="">
@@ -133,7 +133,7 @@
         <div class="user-avatar">HK</div>
         <div class="user-info">
           <strong>Hamad Al-Kuwari</strong>
-          <span>Request Creator</span>
+          <span>Requestor</span>
         </div>
         <span class="ms" style="font-size:10px; color:var(--text-muted);">chevron_right</span>
       </div>
@@ -625,6 +625,143 @@
 
       </div><!-- end creator-page-my-requests -->
 
+      <!-- ====== REQUESTOR: EVENTS PAGE ====== -->
+      <div id="creator-page-events" style="display:none;">
+
+        <div class="page-header">
+          <div class="page-header-left">
+            <h1>Events</h1>
+          </div>
+          <button class="btn btn-primary" onclick="openModal('create-event-modal')">
+            <span class="ms">add_circle</span> Create Event
+          </button>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="glass-card" style="margin-bottom:20px;">
+          <div class="card-body" style="padding-bottom:0;">
+            <div class="filters-bar">
+              <button class="filter-pill active">All (4)</button>
+              <button class="filter-pill">Active (2)</button>
+              <button class="filter-pill">Upcoming (1)</button>
+              <button class="filter-pill">Completed (1)</button>
+              <div class="search-box">
+                <span class="ms">search</span>
+                <input type="text" placeholder="Search events...">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Events grid -->
+        <div style="display:flex; flex-direction:column; gap:16px;">
+
+          <!-- Event 1 — Active -->
+          <div class="glass-card">
+            <div class="card-body">
+              <div style="display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap;">
+                <div style="width:52px; height:52px; background:linear-gradient(135deg,var(--maroon-deep),var(--maroon-light)); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; flex-shrink:0; border:1px solid rgba(201,168,76,0.3);">
+                  <span class="ms" style="color:var(--gold); font-size:22px;">directions_run</span>
+                </div>
+                <div style="flex:1; min-width:0;">
+                  <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:8px;">
+                    <h3 style="font-family:var(--font-display); font-size:18px; font-weight:700; color:var(--text-primary);">Gulf Athletics Championship 2026</h3>
+                    <span class="badge badge-approved">Active</span>
+                  </div>
+                  <div style="display:flex; gap:20px; flex-wrap:wrap; font-size:13px; color:var(--text-secondary);">
+                    <span><span class="ms" style="font-size:14px; vertical-align:middle; margin-right:4px;">calendar_month</span>1 Jun – 15 Jun 2026</span>
+                    <span><span class="ms" style="font-size:14px; vertical-align:middle; margin-right:4px;">location_on</span>Khalifa International Stadium, Doha</span>
+                    <span><span class="ms" style="font-size:14px; vertical-align:middle; margin-right:4px;">how_to_reg</span>84 Accreditations</span>
+                  </div>
+                </div>
+                <div style="display:flex; gap:8px; flex-shrink:0; flex-wrap:wrap;">
+                  <button class="btn btn-ghost btn-sm"><span class="ms">visibility</span> View</button>
+                  <button class="btn btn-primary btn-sm" onclick="showSubPage('creator', 'create')"><span class="ms">add</span> Add Request</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Event 2 — Active -->
+          <div class="glass-card">
+            <div class="card-body">
+              <div style="display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap;">
+                <div style="width:52px; height:52px; background:linear-gradient(135deg,#0D2B5C,#2060B0); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; flex-shrink:0; border:1px solid rgba(96,165,250,0.3);">
+                  <span class="ms" style="color:#60A5FA; font-size:22px;">emoji_events</span>
+                </div>
+                <div style="flex:1; min-width:0;">
+                  <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:8px;">
+                    <h3 style="font-family:var(--font-display); font-size:18px; font-weight:700; color:var(--text-primary);">Asian Games 2026 — Doha</h3>
+                    <span class="badge badge-approved">Active</span>
+                  </div>
+                  <div style="display:flex; gap:20px; flex-wrap:wrap; font-size:13px; color:var(--text-secondary);">
+                    <span><span class="ms" style="font-size:14px; vertical-align:middle; margin-right:4px;">calendar_month</span>15 Sep – 30 Sep 2026</span>
+                    <span><span class="ms" style="font-size:14px; vertical-align:middle; margin-right:4px;">location_on</span>Various Venues, Doha</span>
+                    <span><span class="ms" style="font-size:14px; vertical-align:middle; margin-right:4px;">how_to_reg</span>231 Accreditations</span>
+                  </div>
+                </div>
+                <div style="display:flex; gap:8px; flex-shrink:0; flex-wrap:wrap;">
+                  <button class="btn btn-ghost btn-sm"><span class="ms">visibility</span> View</button>
+                  <button class="btn btn-primary btn-sm" onclick="showSubPage('creator', 'create')"><span class="ms">add</span> Add Request</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Event 3 — Upcoming -->
+          <div class="glass-card">
+            <div class="card-body">
+              <div style="display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap;">
+                <div style="width:52px; height:52px; background:linear-gradient(135deg,#3B1E6B,#6D3ABF); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; flex-shrink:0; border:1px solid rgba(167,139,250,0.3);">
+                  <span class="ms" style="color:#A78BFA; font-size:22px;">sports_soccer</span>
+                </div>
+                <div style="flex:1; min-width:0;">
+                  <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:8px;">
+                    <h3 style="font-family:var(--font-display); font-size:18px; font-weight:700; color:var(--text-primary);">FIFA World Cup 2030 Qualifier</h3>
+                    <span class="badge badge-review">Upcoming</span>
+                  </div>
+                  <div style="display:flex; gap:20px; flex-wrap:wrap; font-size:13px; color:var(--text-secondary);">
+                    <span><span class="ms" style="font-size:14px; vertical-align:middle; margin-right:4px;">calendar_month</span>10 Dec 2026</span>
+                    <span><span class="ms" style="font-size:14px; vertical-align:middle; margin-right:4px;">location_on</span>Jassim Bin Hamad Stadium, Doha</span>
+                    <span><span class="ms" style="font-size:14px; vertical-align:middle; margin-right:4px;">how_to_reg</span>0 Accreditations</span>
+                  </div>
+                </div>
+                <div style="display:flex; gap:8px; flex-shrink:0; flex-wrap:wrap;">
+                  <button class="btn btn-ghost btn-sm"><span class="ms">visibility</span> View</button>
+                  <button class="btn btn-primary btn-sm" onclick="showSubPage('creator', 'create')"><span class="ms">add</span> Add Request</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Event 4 — Completed -->
+          <div class="glass-card" style="opacity:0.75;">
+            <div class="card-body">
+              <div style="display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap;">
+                <div style="width:52px; height:52px; background:rgba(107,114,128,0.15); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; flex-shrink:0; border:1px solid rgba(107,114,128,0.25);">
+                  <span class="ms" style="color:#9CA3AF; font-size:22px;">groups</span>
+                </div>
+                <div style="flex:1; min-width:0;">
+                  <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:8px;">
+                    <h3 style="font-family:var(--font-display); font-size:18px; font-weight:700; color:var(--text-primary);">QOC Annual Staff Summit 2025</h3>
+                    <span class="badge badge-pending">Completed</span>
+                  </div>
+                  <div style="display:flex; gap:20px; flex-wrap:wrap; font-size:13px; color:var(--text-secondary);">
+                    <span><span class="ms" style="font-size:14px; vertical-align:middle; margin-right:4px;">calendar_month</span>10 Dec 2025</span>
+                    <span><span class="ms" style="font-size:14px; vertical-align:middle; margin-right:4px;">location_on</span>QOC Headquarters, Doha</span>
+                    <span><span class="ms" style="font-size:14px; vertical-align:middle; margin-right:4px;">how_to_reg</span>62 Accreditations</span>
+                  </div>
+                </div>
+                <div style="display:flex; gap:8px; flex-shrink:0;">
+                  <button class="btn btn-ghost btn-sm"><span class="ms">history</span> Archive</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- end events list -->
+      </div><!-- end creator-page-events -->
+
     </div><!-- end page-content -->
   </div><!-- end main-content -->
 </div><!-- end creator-dashboard screen -->
@@ -903,7 +1040,7 @@
                   <th>Passport No.</th>
                   <th>Event</th>
                   <th>Role</th>
-                  <th>Creator</th>
+                  <th>Requestor</th>
                   <th>Submitted</th>
                   <th>Status</th>
                   <th>Actions</th>
@@ -2021,6 +2158,57 @@
      MODALS
 ============================================================ -->
 
+<!-- Create Event Modal -->
+<div class="modal-overlay" id="create-event-modal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-icon" style="background:linear-gradient(135deg,var(--maroon-deep),var(--maroon-light)); border-color:rgba(201,168,76,0.3);">
+      <span class="ms">calendar_month</span>
+    </div>
+    <h3>Create New Event</h3>
+    <div style="text-align:left; margin-top:20px; display:flex; flex-direction:column; gap:14px;">
+      <div class="form-group" style="margin:0;">
+        <label>Event Name</label>
+        <input type="text" class="form-control" placeholder="e.g. Gulf Athletics Championship 2027">
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin:0;">
+          <label>Start Date</label>
+          <input type="date" class="form-control">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>End Date</label>
+          <input type="date" class="form-control">
+        </div>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Venue</label>
+        <input type="text" class="form-control" placeholder="Stadium / Venue name, City">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Event Type</label>
+        <select class="form-control">
+          <option>Athletics</option>
+          <option>Football</option>
+          <option>Aquatics</option>
+          <option>Multi-Sport Games</option>
+          <option>Conference / Summit</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Description</label>
+        <textarea class="form-control" placeholder="Brief event description..." style="min-height:72px;"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions" style="margin-top:24px;">
+      <button class="btn btn-ghost" onclick="closeModal('create-event-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="closeModal('create-event-modal')">
+        <span class="ms">check_circle</span> Create Event
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Submit Request Modal -->
 <div class="modal-overlay" id="submit-modal">
   <div class="modal">
@@ -2043,7 +2231,7 @@
     <h3>Approve Request</h3>
     <p>You are about to approve accreditation for <strong>Fatima Khalid Al-Sayed</strong>. An invitation email will be sent automatically.</p>
     <div class="form-group" style="text-align:left;">
-      <label>Optional Message to Creator</label>
+      <label>Optional Message to Requestor</label>
       <textarea class="form-control" placeholder="All documents verified. Approved for Zone B access."></textarea>
     </div>
     <div class="modal-actions">
