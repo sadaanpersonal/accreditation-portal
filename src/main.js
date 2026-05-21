@@ -84,6 +84,9 @@ function renderAllQRs() {
   // Full-screen QRs
   renderQR(document.getElementById('qr-fullscreen-svg-0'), seeds[0]);
   renderQR(document.getElementById('qr-fullscreen-svg-1'), seeds[1]);
+  renderQR(document.getElementById('qr-back-0'), seeds[0]);
+  renderQR(document.getElementById('qr-back-1'), seeds[1]);
+  renderQR(document.getElementById('qr-back-2'), seeds[2]);
 }
 
 // ============================================================
@@ -103,7 +106,7 @@ function showScreen(screenId) {
   document.querySelectorAll('.demo-nav-btn').forEach(b => b.classList.remove('active'));
   const screenMap = {
     'login-creator':0,'creator-dashboard':1,'admin-dashboard':2,
-    'admin-request-detail':3,'user-activate':4,'user-dashboard':5
+    'user-activate':3,'user-dashboard':4
   };
   const idx = screenMap[screenId];
   const btns = document.querySelectorAll('.demo-nav-btn');
@@ -150,13 +153,17 @@ function showSubPage(role, page) {
   if (target) target.style.display = 'block';
   document.querySelectorAll('#creator-dashboard .nav-item').forEach(n => n.classList.remove('active'));
   const titles = {
-    'dashboard':   'Dashboard',
-    'create':      'New Request',
-    'my-requests': 'My Requests',
-    'events':      'Events',
+    'dashboard':       'Dashboard',
+    'create':          'New Request',
+    'my-requests':     'My Requests',
+    'events':          'Events',
+    'request-detail':  'Request Detail',
+    'bulk-upload':     'Bulk Upload',
+    'notifications':   'Notifications',
   };
   const titleEl = document.getElementById('creator-page-title');
   if (titleEl) titleEl.textContent = titles[page] || 'Dashboard';
+  if (page === 'request-detail') renderPipeline();
 }
 
 // ============================================================
@@ -167,9 +174,17 @@ function showAdminPage(page) {
   const target = document.getElementById('admin-page-' + page);
   if (target) target.style.display = 'block';
   document.querySelectorAll('#admin-dashboard .nav-item').forEach(n => n.classList.remove('active'));
-  const titles = {'dashboard':'Admin Dashboard','requests':'All Requests'};
+  const titles = {'dashboard':'Admin Dashboard','requests':'All Requests','create':'New Request','events':'Events','settings':'Settings','request-detail':'Review Request','bulk-upload':'Bulk Upload','notifications':'Notifications'};
   const titleEl = document.getElementById('admin-page-title');
   if (titleEl) titleEl.textContent = titles[page] || 'Dashboard';
+  if (page === 'request-detail') {
+    currentPipelineStage = 1; pipelineRejected = false; pipelineInfoRequested = false; pipelineInfoNote = ''; approvedZones = [];
+    document.querySelectorAll('#zone-picker .zone-picker-item').forEach(el => el.classList.toggle('selected', el.dataset.zone === 'B'));
+    const meta = document.getElementById('pipeline-stage-2-done-meta');
+    if (meta) meta.style.display = 'none';
+    updateZoneDisplays();
+    renderPipeline();
+  }
 }
 
 // ============================================================
@@ -271,6 +286,266 @@ document.addEventListener('touchend',   e => { if (e.changedTouches[0].clientX -
 // Expose functions to global scope (required for inline onclick handlers)
 // ES modules are scoped — window assignment makes them accessible from HTML
 // ============================================================
+// ============================================================
+// Events list/grid toggle
+// ============================================================
+function setEventView(view, btn, scope) {
+  const prefix = scope || 'creator';
+  const listEl = document.getElementById(prefix + '-events-list');
+  const gridEl = document.getElementById(prefix + '-events-grid');
+  if (listEl) listEl.style.display = view === 'list' ? 'flex' : 'none';
+  if (gridEl) gridEl.style.display = view === 'grid' ? 'grid' : 'none';
+  btn?.closest('.view-toggle-group')?.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+  btn?.classList.add('active');
+}
+
+// ============================================================
+// Approval Pipeline State Machine
+// ============================================================
+const PIPELINE_STAGES = [
+  { name: 'FA Owner',      icon: 'verified_user' },
+  { name: 'Zone Owner',    icon: 'map' },
+  { name: 'Media Owner',   icon: 'newspaper' },
+  { name: 'MOI Clearance', icon: 'account_balance' },
+];
+let currentPipelineStage = 1; // 1–4 active, 5 = complete
+let pipelineRejected = false;
+let pipelineInfoRequested = false;
+let pipelineInfoNote = '';
+
+function renderPipeline() {
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById('pipeline-stage-' + i);
+    if (!el) continue;
+    el.className = 'approval-stage' + (i === 4 ? ' is-moi' : '');
+    if (pipelineRejected && i === currentPipelineStage)     el.classList.add('is-rejected');
+    else if (pipelineInfoRequested && i === currentPipelineStage) el.classList.add('is-info');
+    else if (i < currentPipelineStage || currentPipelineStage > 4) el.classList.add('is-done');
+    else if (i === currentPipelineStage)                     el.classList.add('is-active');
+    else                                                     el.classList.add('is-pending');
+
+    const actions = document.getElementById('pipeline-stage-actions-' + i);
+    const showActions = i === currentPipelineStage && !pipelineRejected && !pipelineInfoRequested && currentPipelineStage <= 4;
+    if (actions) actions.style.display = showActions ? 'flex' : 'none';
+
+    const sb = document.getElementById('pipeline-stage-' + i + '-badge');
+    if (sb) {
+      if (pipelineRejected && i === currentPipelineStage)     { sb.textContent = 'Rejected'; sb.className = 'badge badge-rejected'; sb.style.display = ''; }
+      else if (pipelineInfoRequested && i === currentPipelineStage) { sb.textContent = 'Info Requested'; sb.className = 'badge badge-review'; sb.style.display = ''; }
+      else if (i <= currentPipelineStage) sb.style.display = 'none';
+      else { sb.textContent = 'Pending'; sb.className = 'badge badge-pending'; sb.style.display = ''; }
+    }
+  }
+
+  for (let i = 1; i <= 3; i++) {
+    const c = document.getElementById('pipeline-connector-' + i);
+    if (c) {
+      c.classList.toggle('is-done', i < currentPipelineStage && !(pipelineInfoRequested && i === currentPipelineStage));
+      c.classList.toggle('is-info', pipelineInfoRequested && i === currentPipelineStage);
+    }
+  }
+
+  const stageBadge = document.getElementById('pipeline-stage-badge');
+  if (stageBadge) {
+    if (pipelineRejected)             { stageBadge.textContent = 'Rejected';       stageBadge.className = 'badge badge-rejected'; }
+    else if (pipelineInfoRequested)   { stageBadge.textContent = 'Info Requested'; stageBadge.className = 'badge badge-review'; }
+    else if (currentPipelineStage > 4){ stageBadge.textContent = 'Approved';       stageBadge.className = 'badge badge-approved'; }
+    else                               { stageBadge.textContent = 'Stage ' + currentPipelineStage + ' of 4'; stageBadge.className = 'badge badge-review'; }
+  }
+
+  const label = document.getElementById('pipeline-current-label');
+  if (label) {
+    if (pipelineRejected)             label.innerHTML = 'Status: <strong style="color:#F87171;">Rejected at ' + PIPELINE_STAGES[currentPipelineStage - 1].name + '</strong>';
+    else if (pipelineInfoRequested)   label.innerHTML = 'Waiting: <strong style="color:#FBBF24;">Info from applicant — ' + PIPELINE_STAGES[currentPipelineStage - 1].name + '</strong>';
+    else if (currentPipelineStage > 4) label.innerHTML = 'Status: <strong style="color:#4ADE80;">Fully Approved</strong>';
+    else                               label.innerHTML = 'Current: <strong style="color:var(--gold);">' + PIPELINE_STAGES[currentPipelineStage - 1].name + '</strong>';
+  }
+
+  const ha = document.getElementById('pipeline-header-actions');
+  if (ha) ha.style.display = (pipelineRejected || pipelineInfoRequested || currentPipelineStage > 4) ? 'none' : 'flex';
+
+  const appBadge = document.getElementById('applicant-status-badge');
+  if (appBadge) {
+    if (pipelineRejected)             { appBadge.textContent = 'Rejected';       appBadge.className = 'badge badge-rejected'; }
+    else if (pipelineInfoRequested)   { appBadge.textContent = 'Info Requested'; appBadge.className = 'badge badge-review'; }
+    else if (currentPipelineStage > 4){ appBadge.textContent = 'Approved';       appBadge.className = 'badge badge-approved'; }
+    else                               { appBadge.textContent = 'Under Review';   appBadge.className = 'badge badge-pending'; }
+  }
+
+  const cb = document.getElementById('pipeline-complete-banner');
+  if (cb) cb.style.display = currentPipelineStage > 4 ? 'flex' : 'none';
+  const rb = document.getElementById('pipeline-rejected-banner');
+  if (rb) rb.style.display = pipelineRejected ? 'flex' : 'none';
+  const ib = document.getElementById('pipeline-info-banner');
+  if (ib) {
+    ib.style.display = pipelineInfoRequested ? 'flex' : 'none';
+    const inote = document.getElementById('pipeline-info-note-text');
+    if (inote) inote.textContent = pipelineInfoNote;
+  }
+
+  // Mirror state into requestor read-only pipeline (req- prefixed IDs)
+  for (let i = 1; i <= 4; i++) {
+    const rel = document.getElementById('req-pipeline-stage-' + i);
+    if (!rel) continue;
+    rel.className = 'approval-stage' + (i === 4 ? ' is-moi' : '');
+    if (pipelineRejected && i === currentPipelineStage)           rel.classList.add('is-rejected');
+    else if (pipelineInfoRequested && i === currentPipelineStage) rel.classList.add('is-info');
+    else if (i < currentPipelineStage || currentPipelineStage > 4) rel.classList.add('is-done');
+    else if (i === currentPipelineStage)                           rel.classList.add('is-active');
+    else                                                           rel.classList.add('is-pending');
+
+    const rsb = document.getElementById('req-pipeline-stage-' + i + '-badge');
+    if (rsb) {
+      if (pipelineRejected && i === currentPipelineStage)           { rsb.textContent = 'Rejected';       rsb.className = 'badge badge-rejected'; rsb.style.display = ''; }
+      else if (pipelineInfoRequested && i === currentPipelineStage) { rsb.textContent = 'Info Requested'; rsb.className = 'badge badge-review';   rsb.style.display = ''; }
+      else if (i <= currentPipelineStage) rsb.style.display = 'none';
+      else { rsb.textContent = 'Pending'; rsb.className = 'badge badge-pending'; rsb.style.display = ''; }
+    }
+  }
+  for (let i = 1; i <= 3; i++) {
+    const rc = document.getElementById('req-pipeline-connector-' + i);
+    if (rc) {
+      rc.classList.toggle('is-done', i < currentPipelineStage && !(pipelineInfoRequested && i === currentPipelineStage));
+      rc.classList.toggle('is-info', pipelineInfoRequested && i === currentPipelineStage);
+    }
+  }
+  const rstageBadge = document.getElementById('req-pipeline-stage-badge');
+  if (rstageBadge) {
+    if (pipelineRejected)             { rstageBadge.textContent = 'Rejected';       rstageBadge.className = 'badge badge-rejected'; }
+    else if (pipelineInfoRequested)   { rstageBadge.textContent = 'Info Requested'; rstageBadge.className = 'badge badge-review'; }
+    else if (currentPipelineStage > 4){ rstageBadge.textContent = 'Approved';       rstageBadge.className = 'badge badge-approved'; }
+    else                               { rstageBadge.textContent = 'Stage ' + currentPipelineStage + ' of 4'; rstageBadge.className = 'badge badge-review'; }
+  }
+  const rlabel = document.getElementById('req-pipeline-current-label');
+  if (rlabel) {
+    if (pipelineRejected)             rlabel.innerHTML = 'Status: <strong style="color:#F87171;">Rejected at ' + PIPELINE_STAGES[currentPipelineStage - 1].name + '</strong>';
+    else if (pipelineInfoRequested)   rlabel.innerHTML = 'Action required: <strong style="color:#FBBF24;">Additional info needed</strong>';
+    else if (currentPipelineStage > 4) rlabel.innerHTML = 'Status: <strong style="color:#4ADE80;">Fully Approved</strong>';
+    else                               rlabel.innerHTML = 'Pending: <strong style="color:var(--gold);">' + PIPELINE_STAGES[currentPipelineStage - 1].name + '</strong>';
+  }
+  const rappBadge = document.getElementById('req-applicant-status-badge');
+  if (rappBadge) {
+    if (pipelineRejected)             { rappBadge.textContent = 'Rejected';       rappBadge.className = 'badge badge-rejected'; }
+    else if (pipelineInfoRequested)   { rappBadge.textContent = 'Info Requested'; rappBadge.className = 'badge badge-review'; }
+    else if (currentPipelineStage > 4){ rappBadge.textContent = 'Approved';       rappBadge.className = 'badge badge-approved'; }
+    else                               { rappBadge.textContent = 'Under Review';   rappBadge.className = 'badge badge-pending'; }
+  }
+  const rcb = document.getElementById('req-pipeline-complete-banner');
+  if (rcb) rcb.style.display = currentPipelineStage > 4 ? 'flex' : 'none';
+  const rrb = document.getElementById('req-pipeline-rejected-banner');
+  if (rrb) rrb.style.display = pipelineRejected ? 'flex' : 'none';
+  const rib = document.getElementById('req-pipeline-info-banner');
+  if (rib) {
+    rib.style.display = pipelineInfoRequested ? 'flex' : 'none';
+    const rinote = document.getElementById('req-pipeline-info-note-text');
+    if (rinote) rinote.textContent = pipelineInfoNote;
+  }
+  const editPanel = document.getElementById('req-edit-panel');
+  if (editPanel) editPanel.style.display = pipelineInfoRequested ? 'block' : 'none';
+  // Sync zone done meta
+  const rmeta = document.getElementById('req-pipeline-stage-2-done-meta');
+  const ameta = document.getElementById('pipeline-stage-2-done-meta');
+  if (rmeta && ameta) { rmeta.style.display = ameta.style.display; rmeta.innerHTML = ameta.innerHTML; }
+}
+
+function approvePipelineStage() {
+  if (pipelineRejected || currentPipelineStage > 4) return;
+  addPipelineTimelineEntry(PIPELINE_STAGES[currentPipelineStage - 1].name + ' approved by Sultan Al-Ahmed');
+  currentPipelineStage++;
+  renderPipeline();
+}
+
+function rejectPipelineStage() {
+  if (pipelineRejected || currentPipelineStage > 4) return;
+  pipelineRejected = true;
+  addPipelineTimelineEntry('Request rejected at ' + PIPELINE_STAGES[currentPipelineStage - 1].name + ' by Sultan Al-Ahmed');
+  renderPipeline();
+}
+
+function requestInfo() {
+  if (pipelineRejected || pipelineInfoRequested || currentPipelineStage > 4) return;
+  const textarea = document.getElementById('info-note-input');
+  pipelineInfoNote = (textarea && textarea.value.trim()) ? textarea.value.trim() : 'Please provide additional documentation.';
+  if (textarea) textarea.value = '';
+  pipelineInfoRequested = true;
+  addPipelineTimelineEntry('Info requested at ' + PIPELINE_STAGES[currentPipelineStage - 1].name + ' — awaiting applicant response');
+  renderPipeline();
+}
+
+function resubmitRequest() {
+  if (!pipelineInfoRequested) return;
+  const textarea = document.getElementById('resubmit-note-input');
+  const note = (textarea && textarea.value.trim()) ? textarea.value.trim() : '';
+  if (textarea) textarea.value = '';
+  pipelineInfoRequested = false;
+  pipelineInfoNote = '';
+  addPipelineTimelineEntry('Applicant resubmitted request' + (note ? ': ' + note : ''));
+  renderPipeline();
+}
+
+function addPipelineTimelineEntry(text) {
+  const now = new Date();
+  const timeStr = now.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  [
+    document.querySelector('#admin-page-request-detail .timeline'),
+    document.getElementById('req-pipeline-timeline'),
+  ].forEach(timeline => {
+    if (!timeline) return;
+    const item = document.createElement('div');
+    item.className = 'timeline-item is-new';
+    item.innerHTML = '<div class="time">' + timeStr + '</div><div class="event">' + text + '</div>';
+    timeline.insertBefore(item, timeline.firstChild);
+  });
+}
+
+// ============================================================
+// Zone Selection
+// ============================================================
+const ZONE_MAP = {
+  A: { name: 'Zone A', desc: 'VIP / Officials',  icon: 'star' },
+  B: { name: 'Zone B', desc: 'General + Field',  icon: 'map' },
+  C: { name: 'Zone C', desc: 'Press Box',        icon: 'newspaper' },
+  D: { name: 'Zone D', desc: 'Mixed Zone',       icon: 'groups' },
+  E: { name: 'Zone E', desc: 'Technical',        icon: 'engineering' },
+  F: { name: 'Zone F', desc: 'Broadcast',        icon: 'videocam' },
+};
+let approvedZones = [];
+
+function toggleZone(el) { el.classList.toggle('selected'); }
+
+function getSelectedZones() {
+  return Array.from(document.querySelectorAll('#zone-picker .zone-picker-item.selected'))
+    .map(el => el.dataset.zone);
+}
+
+function approveZoneStage() {
+  const zones = getSelectedZones();
+  if (!zones.length) return;
+  approvedZones = zones;
+  updateZoneDisplays();
+  addPipelineTimelineEntry('Zone Owner approved — Access granted: ' + zones.map(z => ZONE_MAP[z].name).join(', '));
+  const meta = document.getElementById('pipeline-stage-2-done-meta');
+  if (meta) { meta.style.display = ''; meta.innerHTML = zones.map(z => `<strong>${ZONE_MAP[z].name}</strong>`).join(' · '); }
+  currentPipelineStage++;
+  renderPipeline();
+}
+
+function updateZoneDisplays() {
+  const zones = approvedZones.length ? approvedZones : ['B'];
+  const azv = document.getElementById('applicant-zones-value');
+  if (azv) azv.innerHTML = zones.map(z =>
+    `<span class="zone-chip"><span class="ms" style="font-size:11px;">${ZONE_MAP[z].icon}</span> ${ZONE_MAP[z].name}</span>`
+  ).join(' ');
+  const mpzv = document.getElementById('modal-pass-zone-value');
+  if (mpzv) mpzv.innerHTML = zones.map(z =>
+    `<span class="pass-zone-chip"><span class="ms">${ZONE_MAP[z].icon}</span>${ZONE_MAP[z].name}</span>`
+  ).join('');
+  const mzc = document.getElementById('modal-zones-chips');
+  if (mzc) mzc.innerHTML = zones.map(z =>
+    `<div class="zone-chip-card"><span class="ms">${ZONE_MAP[z].icon}</span><div><div class="zone-chip-name">${ZONE_MAP[z].name}</div><div class="zone-chip-desc">${ZONE_MAP[z].desc}</div></div></div>`
+  ).join('');
+}
+
 window.showScreen       = showScreen;
 window.switchAcc        = switchAcc;
 window.switchQrEvent    = switchQrEvent;
@@ -284,6 +559,310 @@ window.filterNotif      = filterNotif;
 window.markAllRead      = markAllRead;
 window.toggleSidebar    = toggleSidebar;
 window.closeSidebar     = closeSidebar;
+window.setEventView          = setEventView;
+window.approvePipelineStage  = approvePipelineStage;
+window.rejectPipelineStage   = rejectPipelineStage;
+window.requestInfo           = requestInfo;
+window.resubmitRequest       = resubmitRequest;
+window.showBulkUploadPage    = showBulkUploadPage;
+window.goBackFromBulk        = goBackFromBulk;
+window.downloadBulkTemplate  = downloadBulkTemplate;
+window.renderBulkStep1       = renderBulkStep1;
+window.renderBulkStep2       = renderBulkStep2;
+window.renderBulkStep3       = renderBulkStep3;
+window.handleBulkDrop        = handleBulkDrop;
+window.handleBulkFileSelect  = handleBulkFileSelect;
+window.toggleZone            = toggleZone;
+window.approveZoneStage      = approveZoneStage;
+window.flipPassCard = function(wrapper) {
+  wrapper?.querySelector('.pass-card-inner')?.classList.toggle('flipped');
+};
+
+window.openPassPreview = function() {
+  // Reset flip state each time the modal opens
+  document.querySelector('#pass-preview-modal .pass-card-inner')?.classList.remove('flipped');
+  updateZoneDisplays();
+  openModal('pass-preview-modal');
+  setTimeout(() => {
+    renderQR(document.getElementById('qr-modal-pass'), 42847);
+    renderQR(document.getElementById('qr-modal-side'), 42847);
+    renderQR(document.getElementById('qr-pass-back'),  42847);
+  }, 50);
+};
+
+// ============================================================
+// Bulk Upload
+// ============================================================
+const BULK_SAMPLE_DATA = [
+  { initials:'AH', name:'Ahmed Hassan Al-Mansouri',  passport:'QA-1988-001234', nationality:'Qatari',   event:'Asian Games 2026',    role:'Media',    dob:'15 Apr 1988', email:'ahmed.mansouri@qoc.qa',   phone:'+974 5512 3456' },
+  { initials:'ST', name:'Sarah Elizabeth Thompson',   passport:'GB-1992-087654', nationality:'British',  event:'Asian Games 2026',    role:'VIP',      dob:'22 Jul 1992', email:'s.thompson@bbc.co.uk',     phone:'+44 7700 900123' },
+  { initials:'KR', name:'Khalid Ibrahim Al-Rashidi',  passport:'KW-1985-034521', nationality:'Kuwaiti',  event:'Gulf Athletics 2026', role:'Athlete',  dob:'3 Nov 1985',  email:'k.rashidi@koa.kw',         phone:'+965 9876 5432' },
+  { initials:'MD', name:'Maria Santos Delgado',       passport:'ES-1995-112233', nationality:'Spanish',  event:'Asian Games 2026',    role:'Staff',    dob:'18 Feb 1995', email:'m.delgado@mediagroup.es',  phone:'+34 612 345 678' },
+  { initials:'YJ', name:'Yusuf Abdulrahman Al-Jabri', passport:'OM-1990-067890', nationality:'Omani',    event:'Gulf Athletics 2026', role:'Official', dob:'27 Sep 1990', email:'y.jabri@oman-sports.om',   phone:'+968 9123 4567' },
+];
+
+let bulkCtx = 'creator'; // 'creator' | 'admin'
+
+function getBulkContainer() {
+  return document.getElementById(bulkCtx + '-page-bulk-upload');
+}
+
+function showBulkUploadPage(ctx) {
+  bulkCtx = ctx;
+  if (ctx === 'creator') showSubPage('creator', 'bulk-upload');
+  else showAdminPage('bulk-upload');
+  renderBulkStep1();
+}
+
+function goBackFromBulk() {
+  if (bulkCtx === 'creator') showSubPage('creator', 'my-requests');
+  else showAdminPage('requests');
+}
+
+function downloadBulkTemplate() {
+  const header = 'Name,Passport Number,Nationality,Event,Role,Date of Birth,Email,Phone';
+  const rows = BULK_SAMPLE_DATA.map(r =>
+    [r.name, r.passport, r.nationality, r.event, r.role, r.dob, r.email, r.phone].join(',')
+  );
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: 'qoc_bulk_upload_template.csv' });
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  // Highlight the upload zone after a short delay
+  setTimeout(() => {
+    const dz = getBulkContainer()?.querySelector('.bulk-drop-zone');
+    if (dz) { dz.style.borderColor = 'var(--gold)'; setTimeout(() => { dz.style.borderColor = ''; }, 1200); }
+  }, 400);
+}
+
+function renderBulkStepper(step) {
+  const steps = ['Prepare', 'Review', 'Submit'];
+  return `<div class="bulk-stepper">${steps.map((s, i) => {
+    const n = i + 1;
+    const cls = n < step ? 'is-done' : n === step ? 'is-active' : '';
+    const icon = n < step ? '<span class="ms" style="font-size:14px;">check</span>' : n;
+    return `${i > 0 ? `<div class="bulk-step-line${n <= step ? ' is-done' : ''}"></div>` : ''}
+    <div class="bulk-step-item ${cls}"><div class="bulk-step-num">${icon}</div><span>${s}</span></div>`;
+  }).join('')}</div>`;
+}
+
+function renderBulkStep1() {
+  const c = getBulkContainer(); if (!c) return;
+  c.innerHTML = `
+    <div class="page-header">
+      <div class="page-header-left">
+        <button class="btn btn-ghost btn-sm" onclick="goBackFromBulk()" style="margin-right:8px;"><span class="ms">arrow_back</span></button>
+        <h1>Bulk Upload</h1>
+      </div>
+      <span style="font-size:12px; color:var(--text-muted);">Create multiple accreditation requests at once</span>
+    </div>
+    ${renderBulkStepper(1)}
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start;">
+      <div class="glass-card">
+        <div class="card-header">
+          <div><h3>Download Template</h3><div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Pre-filled with 5 sample records</div></div>
+          <span class="badge badge-approved" style="font-size:10px;">CSV / XLSX</span>
+        </div>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:18px;line-height:1.6;">Use the official QOC accreditation template to prepare your requests. The file includes 5 ready-to-use sample records across two events.</p>
+          <div class="bulk-field-list">
+            ${['Full Name','Passport Number','Nationality','Event Name','Role / Category','Date of Birth','Email Address','Phone Number'].map(f =>
+              `<div class="bulk-field-item"><span class="ms">check_circle</span><span>${f}</span></div>`).join('')}
+          </div>
+          <button class="btn btn-primary" onclick="downloadBulkTemplate()"><span class="ms">download</span> Download Template</button>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:10px;">Supported formats: .csv, .xlsx &nbsp;·&nbsp; Max size: 10 MB</div>
+        </div>
+      </div>
+      <div class="glass-card">
+        <div class="card-header"><div><h3>Upload File</h3><div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Drop the completed template here</div></div></div>
+        <div class="card-body">
+          <div class="bulk-drop-zone" id="bulk-drop-zone"
+               ondragover="event.preventDefault(); this.classList.add('drag-active')"
+               ondragleave="this.classList.remove('drag-active')"
+               ondrop="handleBulkDrop(event)"
+               onclick="document.getElementById('bulk-file-input').click()">
+            <span class="ms" style="font-size:48px; color:var(--text-muted); display:block; margin-bottom:12px;">cloud_upload</span>
+            <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:6px;">Drag & drop your file here</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:20px;">or click to browse</div>
+            <button class="btn btn-ghost" onclick="event.stopPropagation(); document.getElementById('bulk-file-input').click()">
+              <span class="ms">folder_open</span> Browse Files
+            </button>
+            <input id="bulk-file-input" type="file" accept=".csv,.xlsx" style="display:none;" onchange="handleBulkFileSelect(event)">
+            <div style="font-size:11px;color:var(--text-muted);margin-top:16px;">.csv &nbsp;·&nbsp; .xlsx &nbsp;·&nbsp; Max 10 MB</div>
+          </div>
+          <div style="margin-top:16px; padding:12px 14px; background:var(--surface-2); border-radius:var(--radius-md); border:1px solid var(--border);">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Quick tip</div>
+            <div style="font-size:12px;color:var(--text-secondary);line-height:1.6;">Download the template first, fill in your records (or use the sample data), then upload it here to proceed.</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function handleBulkDrop(event) {
+  event.preventDefault();
+  document.getElementById('bulk-drop-zone')?.classList.remove('drag-active');
+  const file = event.dataTransfer?.files?.[0];
+  if (file) processBulkFile(file.name);
+}
+
+function handleBulkFileSelect(event) {
+  const file = event.target?.files?.[0];
+  if (file) processBulkFile(file.name);
+}
+
+function processBulkFile(filename) {
+  // Show processing indicator briefly, then show review
+  const dz = getBulkContainer()?.querySelector('.bulk-drop-zone');
+  if (dz) {
+    dz.classList.add('has-file');
+    dz.innerHTML = `
+      <span class="ms" style="font-size:40px;color:#4ADE80;display:block;margin-bottom:10px;">check_circle</span>
+      <div style="font-size:14px;font-weight:600;color:#4ADE80;margin-bottom:4px;">${filename}</div>
+      <div style="font-size:12px;color:var(--text-muted);">Reading records...</div>`;
+  }
+  setTimeout(() => renderBulkStep2(filename), 900);
+}
+
+function renderBulkStep2(filename) {
+  const c = getBulkContainer(); if (!c) return;
+  const roleColors = { Media:'role-media', VIP:'role-vip', Athlete:'role-athlete', Staff:'role-staff', Official:'role-staff' };
+  const rows = BULK_SAMPLE_DATA.map((r, i) => `
+    <div class="bulk-table-row">
+      <span class="bulk-row-num">${i+1}</span>
+      <div class="bulk-row-name"><div class="bulk-row-avatar">${r.initials}</div><span title="${r.name}">${r.name}</span></div>
+      <span style="font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);">${r.passport}</span>
+      <span style="font-size:12px;color:var(--text-secondary);">${r.nationality}</span>
+      <span style="font-size:12px;color:var(--text-secondary);">${r.event}</span>
+      <span class="role-tag ${roleColors[r.role]||'role-staff'}" style="font-size:10px;">${r.role}</span>
+      <span class="bulk-valid-badge"><span class="ms">check_circle</span> Valid</span>
+    </div>`).join('');
+  c.innerHTML = `
+    <div class="page-header">
+      <div class="page-header-left">
+        <button class="btn btn-ghost btn-sm" onclick="renderBulkStep1()" style="margin-right:8px;"><span class="ms">arrow_back</span></button>
+        <h1>Bulk Upload</h1>
+      </div>
+    </div>
+    ${renderBulkStepper(2)}
+    <div class="bulk-summary-bar">
+      <div class="bulk-stat"><div class="bulk-stat-num">5</div><div class="bulk-stat-label">Records</div></div>
+      <div class="bulk-stat-divider"></div>
+      <div class="bulk-stat"><div class="bulk-stat-num is-valid">5</div><div class="bulk-stat-label">Valid</div></div>
+      <div class="bulk-stat-divider"></div>
+      <div class="bulk-stat"><div class="bulk-stat-num" style="color:var(--text-muted);">0</div><div class="bulk-stat-label">Errors</div></div>
+      <div class="bulk-stat-filename"><span class="ms" style="font-size:14px;">description</span> ${filename || 'qoc_bulk_upload_template.csv'}</div>
+    </div>
+    <div class="glass-card">
+      <div class="card-header">
+        <div><h3>Preview Records</h3><div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Review all records before submitting</div></div>
+        <span class="badge badge-approved">All Valid</span>
+      </div>
+      <div class="bulk-table-wrap">
+        <div class="bulk-table-head">
+          <span>#</span><span>Applicant</span><span>Passport</span><span>Country</span><span>Event</span><span>Role</span><span>Status</span>
+        </div>
+        ${rows}
+      </div>
+      <div class="card-body" style="padding-top:0; padding-bottom:16px;">
+        <div class="bulk-actions-bar">
+          <button class="btn btn-ghost" onclick="renderBulkStep1()"><span class="ms">arrow_back</span> Back</button>
+          <button class="btn btn-primary" style="gap:8px;" onclick="renderBulkStep3()">
+            <span class="ms">send</span> Submit 5 Requests
+            <span style="background:rgba(255,255,255,0.2);border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700;">5</span>
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderBulkStep3() {
+  const c = getBulkContainer(); if (!c) return;
+  const items = BULK_SAMPLE_DATA.map((r, i) => `
+    <div class="bulk-progress-item" id="bulk-prog-${i}">
+      <div class="bulk-progress-avatar">${r.initials}</div>
+      <div class="bulk-progress-info">
+        <div class="bulk-progress-name">${r.name}</div>
+        <div class="bulk-progress-meta">${r.event} &nbsp;·&nbsp; ${r.role}</div>
+      </div>
+      <div class="bulk-progress-status pending" id="bulk-prog-status-${i}">Pending</div>
+    </div>`).join('');
+  c.innerHTML = `
+    <div class="page-header">
+      <div class="page-header-left"><h1>Submitting Requests…</h1></div>
+      <span id="bulk-prog-badge" class="badge badge-review">0 / 5</span>
+    </div>
+    ${renderBulkStepper(3)}
+    <div class="glass-card">
+      <div class="card-body">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:13px;color:var(--text-muted);" id="bulk-prog-label">Starting…</span>
+          <span style="font-size:13px;font-weight:700;" id="bulk-prog-count">0 / 5</span>
+        </div>
+        <div class="bulk-progress-track"><div class="bulk-progress-fill" id="bulk-prog-bar" style="width:0%"></div></div>
+        ${items}
+      </div>
+    </div>`;
+  // Animate each record sequentially
+  let done = 0;
+  function processNext(i) {
+    if (i >= BULK_SAMPLE_DATA.length) { setTimeout(renderBulkComplete, 600); return; }
+    const item = document.getElementById('bulk-prog-' + i);
+    const status = document.getElementById('bulk-prog-status-' + i);
+    if (item) item.classList.add('is-processing');
+    if (status) { status.className = 'bulk-progress-status processing'; status.innerHTML = '<span class="spin ms" style="font-size:16px;">refresh</span> Processing'; }
+    const label = document.getElementById('bulk-prog-label');
+    if (label) label.textContent = 'Processing: ' + BULK_SAMPLE_DATA[i].name;
+    setTimeout(() => {
+      if (item) { item.classList.remove('is-processing'); item.classList.add('is-done'); }
+      if (status) { status.className = 'bulk-progress-status done'; status.innerHTML = '<span class="ms" style="font-size:16px;">check_circle</span> Submitted'; }
+      done++;
+      const bar = document.getElementById('bulk-prog-bar');
+      const badge = document.getElementById('bulk-prog-badge');
+      const count = document.getElementById('bulk-prog-count');
+      if (bar)   bar.style.width = (done / BULK_SAMPLE_DATA.length * 100) + '%';
+      if (badge) badge.textContent = done + ' / ' + BULK_SAMPLE_DATA.length;
+      if (count) count.textContent = done + ' / ' + BULK_SAMPLE_DATA.length;
+      processNext(i + 1);
+    }, 700);
+  }
+  setTimeout(() => processNext(0), 300);
+}
+
+function renderBulkComplete() {
+  const c = getBulkContainer(); if (!c) return;
+  const backPage = bulkCtx === 'creator' ? "showSubPage('creator','my-requests')" : "showAdminPage('requests')";
+  c.innerHTML = `
+    <div class="page-header">
+      <div class="page-header-left"><h1>Bulk Upload</h1></div>
+    </div>
+    ${renderBulkStepper(4)}
+    <div class="glass-card" style="max-width:540px;margin:0 auto;">
+      <div class="card-body">
+        <div class="bulk-complete-box">
+          <div class="bulk-complete-icon"><span class="ms" style="font-size:36px;color:#4ADE80;">check_circle</span></div>
+          <h2 style="font-family:var(--font-display);font-size:22px;margin-bottom:8px;">5 Requests Submitted!</h2>
+          <p style="font-size:14px;color:var(--text-secondary);margin-bottom:28px;line-height:1.6;">All requests are now in the approval pipeline and will be reviewed by the relevant approvers.</p>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:28px;text-align:left;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md);border:1px solid var(--border);">
+              <span style="font-size:13px;color:var(--text-secondary);">Asian Games 2026</span>
+              <span class="badge badge-pending">3 requests</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md);border:1px solid var(--border);">
+              <span style="font-size:13px;color:var(--text-secondary);">Gulf Athletics 2026</span>
+              <span class="badge badge-pending">2 requests</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="${backPage}"><span class="ms">folder_open</span> View Requests</button>
+            <button class="btn btn-ghost" onclick="showBulkUploadPage('${bulkCtx}')"><span class="ms">upload_file</span> Upload More</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
 
 // ============================================================
 // Initialize
