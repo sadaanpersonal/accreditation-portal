@@ -105,8 +105,7 @@ function showScreen(screenId) {
   // Update demo nav
   document.querySelectorAll('.demo-nav-btn').forEach(b => b.classList.remove('active'));
   const screenMap = {
-    'login-creator':0,'creator-dashboard':1,'admin-dashboard':2,
-    'user-activate':3,'user-dashboard':4
+    'creator-dashboard':0,'admin-dashboard':1,'user-dashboard':2
   };
   const idx = screenMap[screenId];
   const btns = document.querySelectorAll('.demo-nav-btn');
