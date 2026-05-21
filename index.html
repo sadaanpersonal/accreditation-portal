@@ -437,6 +437,27 @@
                     <option>World Aquatics 2026 [MOI]</option>
                   </select>
                 </div>
+                <div class="form-group">
+                  <label>Venue</label>
+                  <div class="form-control-icon">
+                    <span class="ms">stadium</span>
+                    <select class="form-control" id="form-venue-select" onchange="onVenueChange(this.value)">
+                      <option value="">— Select venue —</option>
+                      <option value="al-bayt">Al Bayt Stadium</option>
+                      <option value="khalifa">Khalifa International Stadium</option>
+                      <option value="aquatics">Hamad Aquatics Center</option>
+                      <option value="arena">Ali Bin Hamad Al-Attiyah Arena</option>
+                      <option value="qncc">Qatar National Convention Centre</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div id="form-venue-section" style="display:none; margin-bottom:4px;">
+                  <div class="venue-map-container" id="form-venue-map"></div>
+                  <p style="font-size:11px; color:var(--text-muted); margin:8px 0 6px;">Click zones on the map or cards below to select access areas</p>
+                  <div id="form-zone-chips" style="display:grid; grid-template-columns:1fr 1fr; gap:6px;"></div>
+                </div>
+
                 <div class="form-row">
                   <div class="form-group">
                     <label>Accreditation Role</label>
@@ -449,16 +470,6 @@
                       <option>Coach</option>
                     </select>
                   </div>
-                  <div class="form-group">
-                    <label>Access Zones</label>
-                    <select class="form-control">
-                      <option>Zone A (VIP/All Access)</option>
-                      <option>Zone B (General + Field)</option>
-                      <option>Zone C (General Only)</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="form-row">
                   <div class="form-group">
                     <label>Validity From</label>
                     <input type="date" class="form-control">
@@ -1705,6 +1716,27 @@
                     <option>World Aquatics 2026 [MOI]</option>
                   </select>
                 </div>
+                <div class="form-group">
+                  <label>Venue</label>
+                  <div class="form-control-icon">
+                    <span class="ms">stadium</span>
+                    <select class="form-control" onchange="onVenueChange(this.value)">
+                      <option value="">— Select venue —</option>
+                      <option value="al-bayt">Al Bayt Stadium</option>
+                      <option value="khalifa">Khalifa International Stadium</option>
+                      <option value="aquatics">Hamad Aquatics Center</option>
+                      <option value="arena">Ali Bin Hamad Al-Attiyah Arena</option>
+                      <option value="qncc">Qatar National Convention Centre</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div id="admin-form-venue-section" style="display:none; margin-bottom:4px;">
+                  <div class="venue-map-container" id="admin-form-venue-map"></div>
+                  <p style="font-size:11px; color:var(--text-muted); margin:8px 0 6px;">Click zones on the map or cards below to select access areas</p>
+                  <div id="admin-form-zone-chips" style="display:grid; grid-template-columns:1fr 1fr; gap:6px;"></div>
+                </div>
+
                 <div class="form-row">
                   <div class="form-group">
                     <label>Accreditation Role</label>
@@ -1717,16 +1749,6 @@
                       <option>Coach</option>
                     </select>
                   </div>
-                  <div class="form-group">
-                    <label>Access Zones</label>
-                    <select class="form-control">
-                      <option>Zone A (VIP/All Access)</option>
-                      <option>Zone B (General + Field)</option>
-                      <option>Zone C (General Only)</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="form-row">
                   <div class="form-group">
                     <label>Validity From</label>
                     <input type="date" class="form-control">
@@ -2312,14 +2334,14 @@
                     <div class="approval-stage-title">Zone Owner</div>
                     <div class="approval-stage-sub">Assign zone access for this accreditation</div>
                     <div class="approval-stage-actions" id="pipeline-stage-actions-2" style="display:none; flex-direction:column; gap:10px;">
-                      <div style="font-size:11px; color:var(--text-muted);">Select zones this pass grants access to:</div>
+                      <div style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted);">
+                        <span class="ms" style="font-size:14px;">stadium</span>
+                        <span id="admin-venue-name">Al Bayt Stadium</span>
+                        <span style="opacity:0.6;">— click zones to assign access</span>
+                      </div>
+                      <div class="venue-map-container" id="admin-venue-map"></div>
                       <div id="zone-picker" style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
-                        <div class="zone-picker-item" onclick="toggleZone(this)" data-zone="A"><span class="ms">star</span><div class="zone-picker-name">Zone A</div><div class="zone-picker-desc">VIP / Officials</div></div>
-                        <div class="zone-picker-item selected" onclick="toggleZone(this)" data-zone="B"><span class="ms">map</span><div class="zone-picker-name">Zone B</div><div class="zone-picker-desc">General + Field</div></div>
-                        <div class="zone-picker-item" onclick="toggleZone(this)" data-zone="C"><span class="ms">newspaper</span><div class="zone-picker-name">Zone C</div><div class="zone-picker-desc">Press Box</div></div>
-                        <div class="zone-picker-item" onclick="toggleZone(this)" data-zone="D"><span class="ms">groups</span><div class="zone-picker-name">Zone D</div><div class="zone-picker-desc">Mixed Zone</div></div>
-                        <div class="zone-picker-item" onclick="toggleZone(this)" data-zone="E"><span class="ms">engineering</span><div class="zone-picker-name">Zone E</div><div class="zone-picker-desc">Technical</div></div>
-                        <div class="zone-picker-item" onclick="toggleZone(this)" data-zone="F"><span class="ms">videocam</span><div class="zone-picker-name">Zone F</div><div class="zone-picker-desc">Broadcast</div></div>
+                        <!-- Populated by initAdminVenueMap() -->
                       </div>
                       <div style="display:flex; gap:6px; flex-wrap:wrap;">
                         <button class="btn btn-success btn-sm" onclick="approveZoneStage()"><span class="ms">check</span> Approve Zones</button>

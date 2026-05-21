@@ -326,6 +326,7 @@ function renderPipeline() {
     const actions = document.getElementById('pipeline-stage-actions-' + i);
     const showActions = i === currentPipelineStage && !pipelineRejected && !pipelineInfoRequested && currentPipelineStage <= 4;
     if (actions) actions.style.display = showActions ? 'flex' : 'none';
+    if (i === 2 && showActions) setTimeout(initAdminVenueMap, 0);
 
     const sb = document.getElementById('pipeline-stage-' + i + '-badge');
     if (sb) {
@@ -498,23 +499,196 @@ function addPipelineTimelineEntry(text) {
 }
 
 // ============================================================
-// Zone Selection
+// Venue & Zone System
 // ============================================================
-const ZONE_MAP = {
-  A: { name: 'Zone A', desc: 'VIP / Officials',  icon: 'star' },
-  B: { name: 'Zone B', desc: 'General + Field',  icon: 'map' },
-  C: { name: 'Zone C', desc: 'Press Box',        icon: 'newspaper' },
-  D: { name: 'Zone D', desc: 'Mixed Zone',       icon: 'groups' },
-  E: { name: 'Zone E', desc: 'Technical',        icon: 'engineering' },
-  F: { name: 'Zone F', desc: 'Broadcast',        icon: 'videocam' },
-};
+const VENUES = [
+  {
+    id: 'al-bayt', name: 'Al Bayt Stadium', icon: 'stadium',
+    zones: [
+      { id:'field', label:'Playing Field',  desc:'Pitch & athlete tunnel',    icon:'sports_soccer',   color:'#4ADE80', sx:60,  sy:70,  sw:280, sh:120 },
+      { id:'north', label:'North Stand',    desc:'General public seating',    icon:'groups',          color:'#A78BFA', sx:60,  sy:10,  sw:280, sh:60  },
+      { id:'south', label:'South Stand',    desc:'General public seating',    icon:'groups',          color:'#34D399', sx:60,  sy:190, sw:280, sh:60  },
+      { id:'vip',   label:'VIP Stand',      desc:'Hospitality & officials',   icon:'star',            color:'#C9A84C', sx:10,  sy:10,  sw:50,  sh:240 },
+      { id:'media', label:'Media Tribune',  desc:'Accredited media seating',  icon:'newspaper',       color:'#60A5FA', sx:340, sy:10,  sw:50,  sh:115 },
+      { id:'press', label:'Press Box',      desc:'Broadcast & print media',   icon:'mic',             color:'#FB923C', sx:340, sy:125, sw:50,  sh:125 },
+    ]
+  },
+  {
+    id: 'khalifa', name: 'Khalifa International Stadium', icon: 'stadium',
+    zones: [
+      { id:'track', label:'Track & Field',  desc:'Competition running track', icon:'directions_run',  color:'#4ADE80', sx:60,  sy:70,  sw:280, sh:120 },
+      { id:'north', label:'North Stand',    desc:'General seating',           icon:'groups',          color:'#A78BFA', sx:60,  sy:10,  sw:280, sh:60  },
+      { id:'south', label:'South Stand',    desc:'General seating',           icon:'groups',          color:'#34D399', sx:60,  sy:190, sw:280, sh:60  },
+      { id:'vip',   label:'VIP Suite',      desc:'Executive hospitality',     icon:'star',            color:'#C9A84C', sx:10,  sy:10,  sw:50,  sh:120 },
+      { id:'media', label:'Media Center',   desc:'Press & broadcast hub',     icon:'newspaper',       color:'#FB923C', sx:10,  sy:130, sw:50,  sh:120 },
+      { id:'east',  label:'East Stand',     desc:'General seating east side', icon:'groups',          color:'#60A5FA', sx:340, sy:10,  sw:50,  sh:240 },
+    ]
+  },
+  {
+    id: 'aquatics', name: 'Hamad Aquatics Center', icon: 'pool',
+    zones: [
+      { id:'comp',   label:'Competition Pool', desc:'Main competition lanes',    icon:'pool',            color:'#38BDF8', sx:10,  sy:55,  sw:225, sh:130 },
+      { id:'warmup', label:'Warm-up Pool',     desc:'Athlete preparation area',  icon:'pool',            color:'#34D399', sx:245, sy:55,  sw:145, sh:130 },
+      { id:'off',    label:'Officials Area',   desc:'Judges & timing officials', icon:'manage_accounts', color:'#A78BFA', sx:10,  sy:10,  sw:380, sh:45  },
+      { id:'vip',    label:'VIP Gallery',      desc:'Hospitality seating',       icon:'star',            color:'#C9A84C', sx:10,  sy:190, sw:380, sh:40  },
+      { id:'media',  label:'Media Zone',       desc:'Press & broadcast area',    icon:'newspaper',       color:'#60A5FA', sx:10,  sy:232, sw:380, sh:22  },
+    ]
+  },
+  {
+    id: 'arena', name: 'Ali Bin Hamad Al-Attiyah Arena', icon: 'sports_basketball',
+    zones: [
+      { id:'court',  label:'Court',          desc:'Playing surface',          icon:'sports_basketball', color:'#FB923C', sx:60,  sy:60,  sw:280, sh:140 },
+      { id:'north',  label:'North Stand',    desc:'Spectator seating',        icon:'groups',            color:'#A78BFA', sx:60,  sy:10,  sw:280, sh:50  },
+      { id:'south',  label:'South Stand',    desc:'Spectator seating',        icon:'groups',            color:'#34D399', sx:60,  sy:200, sw:280, sh:50  },
+      { id:'vip',    label:'VIP Suite',      desc:'Premium hospitality',      icon:'star',              color:'#C9A84C', sx:10,  sy:10,  sw:50,  sh:240 },
+      { id:'media',  label:'Media Box',      desc:'Press & commentary',       icon:'newspaper',         color:'#60A5FA', sx:340, sy:10,  sw:50,  sh:240 },
+    ]
+  },
+  {
+    id: 'qncc', name: 'Qatar National Convention Centre', icon: 'account_balance',
+    zones: [
+      { id:'hall',   label:'Main Hall',      desc:'Main ceremony & events',   icon:'event',           color:'#A78BFA', sx:130, sy:10,  sw:140, sh:240 },
+      { id:'vip',    label:'VIP Lounge',     desc:'Executive reception',      icon:'star',            color:'#C9A84C', sx:10,  sy:10,  sw:120, sh:120 },
+      { id:'back',   label:'Backstage',      desc:'Performer & crew area',    icon:'theater_comedy',  color:'#34D399', sx:10,  sy:130, sw:120, sh:120 },
+      { id:'media',  label:'Media Room',     desc:'Press conference area',    icon:'newspaper',       color:'#60A5FA', sx:270, sy:10,  sw:120, sh:120 },
+      { id:'expo',   label:'Exhibition',     desc:'Display & demo area',      icon:'museum',          color:'#FB923C', sx:270, sy:130, sw:120, sh:120 },
+    ]
+  },
+];
+
+let activeVenueId = null;
+let formSelZones  = [];
 let approvedZones = [];
 
-function toggleZone(el) { el.classList.toggle('selected'); }
+function getVenue(id)            { return VENUES.find(v => v.id === (id || activeVenueId || 'al-bayt')); }
+function getVenueZone(zoneId)    { return getVenue()?.zones.find(z => z.id === zoneId) || { label: zoneId, icon: 'map', desc: '', color: '#888' }; }
+
+function buildVenueMapSvg(venue, selIds, ctx) {
+  const shapes = venue.zones.map(z => {
+    const sel  = selIds.includes(z.id);
+    const cx   = z.sx + z.sw / 2;
+    const cy   = z.sy + z.sh / 2;
+    const narrow = z.sw < z.sh * 0.65;
+    const fs   = Math.min(Math.max(Math.min(z.sw, z.sh) / 3.5, 7), 11);
+    const words = z.label.split(' ').slice(0, 2);
+    let lbl;
+    if (narrow) {
+      lbl = `<text transform="rotate(-90 ${cx} ${cy})" x="${cx}" y="${cy}"
+        text-anchor="middle" dominant-baseline="middle" font-size="${fs}"
+        font-family="DM Sans,sans-serif" font-weight="600"
+        class="vzone-label" style="pointer-events:none;">${z.label.slice(0, 10)}</text>`;
+    } else if (z.sh < 36 || words.length === 1) {
+      lbl = `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle"
+        font-size="${fs}" font-family="DM Sans,sans-serif" font-weight="600"
+        class="vzone-label" style="pointer-events:none;">${words[0]}</text>`;
+    } else {
+      const lh = fs + 2;
+      lbl = `<text text-anchor="middle" font-size="${fs}" font-family="DM Sans,sans-serif"
+        font-weight="600" class="vzone-label" style="pointer-events:none;">
+        <tspan x="${cx}" y="${cy - lh / 2}">${words[0]}</tspan>
+        <tspan x="${cx}" y="${cy + lh / 2}">${words[1]}</tspan>
+      </text>`;
+    }
+    return `<g class="vzone${sel ? ' vzone-sel' : ''}" style="--zc:${z.color}; cursor:pointer;"
+      onclick="toggleVenueZone('${z.id}','${ctx}')">
+      <rect class="vzone-rect" x="${z.sx}" y="${z.sy}" width="${z.sw}" height="${z.sh}" rx="4"/>
+      ${lbl}
+    </g>`;
+  }).join('');
+  return `<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg" width="100%" style="display:block;">
+    <rect width="400" height="260" rx="8" fill="none"/>
+    ${shapes}
+  </svg>`;
+}
+
+function buildZoneChipGrid(venue, selIds, ctx) {
+  return venue.zones.map(z => {
+    const sel = selIds.includes(z.id);
+    return `<div class="venue-zone-chip${sel ? ' vzchip-sel' : ''}"
+      style="--zc:${z.color};" onclick="toggleVenueZone('${z.id}','${ctx}')">
+      <span class="ms" style="font-size:15px; color:${sel ? '#fff' : z.color};">${z.icon}</span>
+      <div style="flex:1; min-width:0;">
+        <div class="vzchip-name">${z.label}</div>
+        <div class="vzchip-desc">${z.desc}</div>
+      </div>
+      ${sel ? `<span class="ms" style="font-size:14px; color:${z.color}; margin-left:auto; flex-shrink:0;">check_circle</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function onVenueChange(venueId) {
+  activeVenueId = venueId || null;
+  formSelZones  = [];
+  // creator form
+  const sec1 = document.getElementById('form-venue-section');
+  if (sec1) sec1.style.display = venueId ? '' : 'none';
+  // admin form
+  const sec2 = document.getElementById('admin-form-venue-section');
+  if (sec2) sec2.style.display = venueId ? '' : 'none';
+  if (!venueId) return;
+  refreshFormVenueMap();
+}
+
+function refreshFormVenueMap() {
+  const venue = getVenue();
+  if (!venue) return;
+  // creator form
+  const mapEl   = document.getElementById('form-venue-map');
+  const chipsEl = document.getElementById('form-zone-chips');
+  if (mapEl)   mapEl.innerHTML   = buildVenueMapSvg(venue, formSelZones, 'form');
+  if (chipsEl) chipsEl.innerHTML = buildZoneChipGrid(venue, formSelZones, 'form');
+  // admin form (same selections, same ctx)
+  const aMapEl   = document.getElementById('admin-form-venue-map');
+  const aChipsEl = document.getElementById('admin-form-zone-chips');
+  if (aMapEl)   aMapEl.innerHTML   = buildVenueMapSvg(venue, formSelZones, 'form');
+  if (aChipsEl) aChipsEl.innerHTML = buildZoneChipGrid(venue, formSelZones, 'form');
+}
+
+function toggleVenueZone(zoneId, ctx) {
+  if (ctx === 'form') {
+    const idx = formSelZones.indexOf(zoneId);
+    if (idx >= 0) formSelZones.splice(idx, 1); else formSelZones.push(zoneId);
+    refreshFormVenueMap();
+  } else {
+    const item = document.querySelector(`#zone-picker [data-zone="${zoneId}"]`);
+    if (item) item.classList.toggle('selected');
+    refreshAdminVenueMap();
+  }
+}
+
+function initAdminVenueMap() {
+  const venue = getVenue();
+  if (!venue) return;
+  const nameEl = document.getElementById('admin-venue-name');
+  if (nameEl) nameEl.textContent = venue.name;
+  const picker = document.getElementById('zone-picker');
+  if (picker) {
+    picker.innerHTML = venue.zones.map(z =>
+      `<div class="zone-picker-item" onclick="toggleZone(this)" data-zone="${z.id}">
+        <span class="ms">${z.icon}</span>
+        <div class="zone-picker-name">${z.label}</div>
+        <div class="zone-picker-desc">${z.desc}</div>
+      </div>`
+    ).join('');
+  }
+  refreshAdminVenueMap();
+}
+
+function refreshAdminVenueMap() {
+  const venue  = getVenue();
+  if (!venue) return;
+  const selIds = Array.from(document.querySelectorAll('#zone-picker .zone-picker-item.selected')).map(el => el.dataset.zone);
+  const mapEl  = document.getElementById('admin-venue-map');
+  if (mapEl) mapEl.innerHTML = buildVenueMapSvg(venue, selIds, 'admin');
+}
+
+function toggleZone(el) {
+  el.classList.toggle('selected');
+  refreshAdminVenueMap();
+}
 
 function getSelectedZones() {
-  return Array.from(document.querySelectorAll('#zone-picker .zone-picker-item.selected'))
-    .map(el => el.dataset.zone);
+  return Array.from(document.querySelectorAll('#zone-picker .zone-picker-item.selected')).map(el => el.dataset.zone);
 }
 
 function approveZoneStage() {
@@ -522,27 +696,28 @@ function approveZoneStage() {
   if (!zones.length) return;
   approvedZones = zones;
   updateZoneDisplays();
-  addPipelineTimelineEntry('Zone Owner approved — Access granted: ' + zones.map(z => ZONE_MAP[z].name).join(', '));
+  addPipelineTimelineEntry('Zone Owner approved — Access granted: ' + zones.map(z => getVenueZone(z).label).join(', '));
   const meta = document.getElementById('pipeline-stage-2-done-meta');
-  if (meta) { meta.style.display = ''; meta.innerHTML = zones.map(z => `<strong>${ZONE_MAP[z].name}</strong>`).join(' · '); }
+  if (meta) { meta.style.display = ''; meta.innerHTML = zones.map(z => `<strong>${getVenueZone(z).label}</strong>`).join(' · '); }
   currentPipelineStage++;
   renderPipeline();
 }
 
 function updateZoneDisplays() {
-  const zones = approvedZones.length ? approvedZones : ['B'];
+  const zones = approvedZones.length ? approvedZones : ['field'];
+  const fmt = (id, fn) => { const d = getVenueZone(id); return fn(d); };
   const azv = document.getElementById('applicant-zones-value');
-  if (azv) azv.innerHTML = zones.map(z =>
-    `<span class="zone-chip"><span class="ms" style="font-size:11px;">${ZONE_MAP[z].icon}</span> ${ZONE_MAP[z].name}</span>`
-  ).join(' ');
+  if (azv) azv.innerHTML = zones.map(z => fmt(z, d =>
+    `<span class="zone-chip"><span class="ms" style="font-size:11px;">${d.icon}</span> ${d.label}</span>`
+  )).join(' ');
   const mpzv = document.getElementById('modal-pass-zone-value');
-  if (mpzv) mpzv.innerHTML = zones.map(z =>
-    `<span class="pass-zone-chip"><span class="ms">${ZONE_MAP[z].icon}</span>${ZONE_MAP[z].name}</span>`
-  ).join('');
+  if (mpzv) mpzv.innerHTML = zones.map(z => fmt(z, d =>
+    `<span class="pass-zone-chip"><span class="ms">${d.icon}</span>${d.label}</span>`
+  )).join('');
   const mzc = document.getElementById('modal-zones-chips');
-  if (mzc) mzc.innerHTML = zones.map(z =>
-    `<div class="zone-chip-card"><span class="ms">${ZONE_MAP[z].icon}</span><div><div class="zone-chip-name">${ZONE_MAP[z].name}</div><div class="zone-chip-desc">${ZONE_MAP[z].desc}</div></div></div>`
-  ).join('');
+  if (mzc) mzc.innerHTML = zones.map(z => fmt(z, d =>
+    `<div class="zone-chip-card"><span class="ms">${d.icon}</span><div><div class="zone-chip-name">${d.label}</div><div class="zone-chip-desc">${d.desc}</div></div></div>`
+  )).join('');
 }
 
 window.showScreen       = showScreen;
@@ -573,6 +748,9 @@ window.handleBulkDrop        = handleBulkDrop;
 window.handleBulkFileSelect  = handleBulkFileSelect;
 window.toggleZone            = toggleZone;
 window.approveZoneStage      = approveZoneStage;
+window.onVenueChange         = onVenueChange;
+window.toggleVenueZone       = toggleVenueZone;
+window.initAdminVenueMap     = initAdminVenueMap;
 window.flipPassCard = function(wrapper) {
   wrapper?.querySelector('.pass-card-inner')?.classList.toggle('flipped');
 };
