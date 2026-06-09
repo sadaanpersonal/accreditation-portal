@@ -1,40 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, LogIn, AlertCircle, Loader } from "lucide-react";
+import { Eye, EyeOff, LogIn, AlertCircle, Loader, HelpCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-
-const DEMO_USERS = [
-  { label: "Admin",       email: "admin@qoc.qa",       password: "Admin@1234!" },
-  { label: "FA Owner",    email: "fa-owner@qoc.qa",    password: "Admin@1234!" },
-  { label: "Requestor",   email: "requestor1@demo.qa", password: "Demo@1234!" },
-  { label: "Accredited",  email: "requestor2@demo.qa", password: "Demo@1234!" },
-];
+import { HowItWorksModal } from "@/components/shared/HowItWorksModal";
 
 export default function LoginPage() {
   const { login } = useAuth();
 
-  const [email,    setEmail]    = useState("");
-  const [password, setPassword] = useState("");
-  const [showPw,   setShowPw]   = useState(false);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState("");
+  const [email,     setEmail]     = useState("");
+  const [password,  setPassword]  = useState("");
+  const [showPw,    setShowPw]    = useState(false);
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState("");
+  const [guideOpen, setGuideOpen] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
     const result = await login(email.trim(), password);
-    setLoading(false);
-    if (!result.success) setError(result.message);
-  }
-
-  async function loginAs(demo: typeof DEMO_USERS[0]) {
-    setEmail(demo.email);
-    setPassword(demo.password);
-    setError("");
-    setLoading(true);
-    const result = await login(demo.email, demo.password);
     setLoading(false);
     if (!result.success) setError(result.message);
   }
@@ -118,36 +103,36 @@ export default function LoginPage() {
               disabled={loading}
               style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 4 }}
             >
-              {loading ? <Loader size={16} style={{ animation: "spin 1s linear infinite" }} /> : <LogIn size={16} />}
+              {loading
+                ? <Loader size={16} style={{ animation: "spin 1s linear infinite" }} />
+                : <LogIn size={16} />}
               {loading ? "Signing in…" : "Sign In"}
             </button>
           </form>
+        </div>
 
-          {/* Demo quick-login */}
-          <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
-            <p style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 10, textAlign: "center", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-              Demo Quick Login
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-              {DEMO_USERS.map(u => (
-                <button
-                  key={u.label}
-                  onClick={() => loginAs(u)}
-                  disabled={loading}
-                  className="btn btn-secondary btn-sm"
-                  style={{ fontSize: 11 }}
-                >
-                  {u.label}
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* How it Works link */}
+        <div style={{ textAlign: "center", marginTop: 18 }}>
+          <button
+            onClick={() => setGuideOpen(true)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              display: "inline-flex", alignItems: "center", gap: 6,
+              fontSize: 13, color: "var(--text-muted)",
+              transition: "color 0.15s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.color = "var(--text-primary)")}
+            onMouseLeave={e => (e.currentTarget.style.color = "var(--text-muted)")}
+          >
+            <HelpCircle size={14} />
+            How it Works
+          </button>
         </div>
       </div>
 
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+      <HowItWorksModal open={guideOpen} onClose={() => setGuideOpen(false)} />
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

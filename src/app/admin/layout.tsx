@@ -2,8 +2,7 @@
 
 import {
   LayoutDashboard, PlusCircle, Upload, FolderOpen,
-  ClipboardCheck, Send, CalendarDays, Users,
-  Bell, Settings,
+  ClipboardCheck, Send, CalendarDays, Users, Settings,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import type { NavSection } from "@/components/layout/Sidebar";
@@ -13,7 +12,7 @@ const NAV: NavSection[] = [
   {
     label: "Overview",
     items: [
-      { label: "Dashboard", href: "/admin", icon: <LayoutDashboard size={16} /> },
+      { label: "Dashboard",    href: "/admin",              icon: <LayoutDashboard size={16} /> },
     ],
   },
   {
@@ -29,15 +28,9 @@ const NAV: NavSection[] = [
   {
     label: "Management",
     items: [
-      { label: "Events",   href: "/admin/events",   icon: <CalendarDays size={16} /> },
-      { label: "Users",    href: "/admin/users",    icon: <Users size={16} /> },
-      { label: "Settings", href: "/admin/settings", icon: <Settings size={16} /> },
-    ],
-  },
-  {
-    label: "System",
-    items: [
-      { label: "Notifications", href: "/admin/notifications", icon: <Bell size={16} /> },
+      { label: "Events",    href: "/admin/events",    icon: <CalendarDays size={16} /> },
+      { label: "Users",     href: "/admin/users",     icon: <Users size={16} /> },
+      { label: "Settings",  href: "/admin/settings",  icon: <Settings size={16} /> },
     ],
   },
 ];
@@ -45,12 +38,12 @@ const NAV: NavSection[] = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
 
-  const fullName = user ? `${user.firstName} ${user.lastName}`.trim() || user.email : "Admin";
-  const initials = user
+  const fullName  = user ? `${user.firstName} ${user.lastName}`.trim() || user.email : "Admin";
+  const initials  = user
     ? ((user.firstName?.[0] ?? "") + (user.lastName?.[0] ?? "")).toUpperCase() || "A"
     : "A";
   const roleLabel = user
-    ? user.role.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+    ? (user.roleCode ?? user.role).replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
     : "Admin";
 
   return (

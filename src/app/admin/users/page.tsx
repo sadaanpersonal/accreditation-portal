@@ -16,17 +16,18 @@ const ROLE_STYLE: Record<string, { color: string; bg: string; border: string }> 
   ACCREDITED:   { color: "#4ADE80", bg: "rgba(74,222,128,0.1)",   border: "rgba(74,222,128,0.3)" },
 };
 
-function roleStyle(role: string) {
-  return ROLE_STYLE[role] ?? ROLE_STYLE.REQUESTOR;
+function roleStyle(role: string | null | undefined) {
+  return ROLE_STYLE[role ?? ""] ?? ROLE_STYLE.REQUESTOR;
 }
 
-function roleLabel(role: string) {
+function roleLabel(role: string | null | undefined) {
+  if (!role) return "No Role";
   return role.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 }
 
-function roleIcon(role: string, color: string) {
+function roleIcon(role: string | null | undefined, color: string) {
   if (role === "SUPER_ADMIN") return <ShieldCheck size={14} color={color} />;
-  if (role.includes("OWNER") || role === "MOI_OFFICER") return <Shield size={14} color={color} />;
+  if (role?.includes("OWNER") || role === "MOI_OFFICER") return <Shield size={14} color={color} />;
   return <User size={14} color={color} />;
 }
 
@@ -59,7 +60,7 @@ export default function UsersPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const roleOptions = Array.from(new Set(users.map(u => u.role))).filter(Boolean);
+  const roleOptions = Array.from(new Set(users.map(u => u.role))).filter((r): r is string => !!r);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>

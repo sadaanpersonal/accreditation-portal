@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { Sidebar, type NavSection } from "./Sidebar";
 import { Topbar } from "./Topbar";
-import { DemoNav } from "./DemoNav";
 
 interface Props {
   navSections: NavSection[];
@@ -27,31 +26,28 @@ export function AppLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div style={{ paddingTop: 52 }}>
-      <DemoNav />
-      <div className="app-shell">
-        <Sidebar
-          sections={navSections}
-          open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          userName={userName}
-          userRole={userRole}
-          userInitials={userInitials}
-          brandTitle={brandTitle}
-          brandSub={brandSub}
+    <div className="app-shell">
+      <Sidebar
+        sections={navSections}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        userName={userName}
+        userRole={userRole}
+        userInitials={userInitials}
+        brandTitle={brandTitle}
+        brandSub={brandSub}
+      />
+      <div className="main-content">
+        <Topbar
+          title={topbarTitle}
+          subtitle={topbarSubtitle}
+          onMenuToggle={() => setSidebarOpen(o => !o)}
+          actions={topbarActions}
+          initials={userInitials}
+          hasNotif={hasNotif}
+          onNotifClick={onNotifClick}
         />
-        <div className="main-content">
-          <Topbar
-            title={topbarTitle}
-            subtitle={topbarSubtitle}
-            onMenuToggle={() => setSidebarOpen(o => !o)}
-            actions={topbarActions}
-            initials={userInitials}
-            hasNotif={hasNotif}
-            onNotifClick={onNotifClick}
-          />
-          <div className="page-content">{children}</div>
-        </div>
+        <div className="page-content">{children}</div>
       </div>
     </div>
   );

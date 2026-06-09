@@ -6,22 +6,12 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const NAV: NavSection[] = [
   {
-    label: "Overview",
+    label: "Menu",
     items: [
-      { label: "Dashboard", href: "/accredited", icon: <LayoutDashboard size={16} /> },
-    ],
-  },
-  {
-    label: "My Pass",
-    items: [
-      { label: "Accreditation Pass", href: "/accredited/pass", icon: <CreditCard size={16} /> },
-      { label: "QR Code",            href: "/accredited/qr",   icon: <QrCode size={16} /> },
-    ],
-  },
-  {
-    label: "Account",
-    items: [
-      { label: "Notifications", href: "/accredited/notifications", icon: <Bell size={16} /> },
+      { label: "Dashboard",          href: "/accredited",               icon: <LayoutDashboard size={16} /> },
+      { label: "My Accreditations",  href: "/accredited/pass",          icon: <CreditCard size={16} /> },
+      { label: "QR Pass",            href: "/accredited/qr",            icon: <QrCode size={16} /> },
+      { label: "Notifications",      href: "/accredited/notifications",  icon: <Bell size={16} /> },
     ],
   },
 ];

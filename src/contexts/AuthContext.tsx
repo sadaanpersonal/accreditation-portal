@@ -118,12 +118,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const payload = decodeJwtPayload(tokens.accessToken);
       const exp     = payload?.["exp"] as number | undefined;
       if (exp && Date.now() / 1000 > exp) {
-        // Token expired; clear and redirect to login
         clearTokens();
         clearUser();
         setState({ user: null, isLoading: false, isAuthenticated: false });
         return;
       }
+
+      // Stale-token guard: admin/reviewer roles should always have permissions.
+      // If the stored user object has no permissions (e.g. token was issued before
+      // permission claims were added), try to recover them from the JWT payload.
+      // If the JWT also has no permission claims, force re-login.
+      const adminRoles: string[] = [
+        Roles.SuperAdmin, Roles.FAOwner, Roles.ZoneOwner,
+        Roles.MediaOwner, Roles.MoiOfficer,
+      ];
+      const storedRole = user.roleCode ?? user.role ?? "";
+      if (adminRoles.includes(storedRole) && !(user.permissions?.length)) {
+        const jwtPerms = (() => {
+          const p = payload?.["permission"];
+          if (Array.isArray(p)) return p as string[];
+          if (typeof p === "string") return [p];
+          return [] as string[];
+        })();
+
+        if (jwtPerms.length === 0) {
+          // JWT has no permission claims — stale token; force re-login
+          clearTokens();
+          clearUser();
+          setState({ user: null, isLoading: false, isAuthenticated: false });
+          return;
+        }
+        // Patch cached user with permissions recovered from JWT
+        const patched = { ...user, permissions: jwtPerms };
+        saveUser(patched);
+        setState({ user: patched, isLoading: false, isAuthenticated: true });
+        return;
+      }
+
       setState({ user, isLoading: false, isAuthenticated: true });
     } else {
       setState({ user: null, isLoading: false, isAuthenticated: false });
@@ -143,15 +174,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const tokenData: TokenResponse = res.data;
       saveTokens({ accessToken: tokenData.accessToken, refreshToken: tokenData.refreshToken });
 
-      // Prefer userInfo from response; fall back to JWT decode
-      const user = tokenData.userInfo ?? userInfoFromToken(tokenData.accessToken);
+      // 1. Prefer server-provided userInfo (new backend: property is "userInfo")
+      // 2. Fall back to raw "user" property (old backend before rename)
+      // 3. Last resort: decode from the JWT payload itself
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rawData = res.data as any;
+      const user =
+        tokenData.userInfo ??
+        (rawData.user as UserInfo | undefined) ??
+        userInfoFromToken(tokenData.accessToken);
+
       if (!user) return { success: false, message: "Could not parse user info." };
 
       saveUser(user);
       setState({ user, isLoading: false, isAuthenticated: true });
 
-      // Route by role
-      const role = user.roleCode ?? user.role;
+      // Route by role code (e.g. "SUPER_ADMIN", "FA_OWNER", "REQUESTOR")
+      const role = user.roleCode ?? user.role ?? "";
       if (role === Roles.SuperAdmin || role === Roles.FAOwner || role === Roles.ZoneOwner
           || role === Roles.MediaOwner || role === Roles.MoiOfficer) {
         router.push("/admin");
@@ -160,7 +199,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (role === Roles.Accredited) {
         router.push("/accredited");
       } else {
-        router.push("/");
+        // Unknown role — send to login so the user can see what's happening
+        router.push("/login");
       }
 
       return { success: true, message: "Login successful." };
@@ -193,7 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (role: string | string[]): boolean => {
       if (!state.user) return false;
       const userRole = state.user.roleCode ?? state.user.role;
-      return Array.isArray(role) ? role.includes(userRole) : userRole === role;
+      return Array.isArray(role) ? role?.includes(userRole) : userRole === role;
     },
     [state.user],
   );

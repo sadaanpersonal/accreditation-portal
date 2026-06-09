@@ -370,8 +370,8 @@ export interface UserDto {
   fullName:   string;
   email:      string;
   phone?:     string;
-  role:       string;
-  roleName:   string;
+  role:       string | null;
+  roleName:   string | null;
   isActive:   boolean;
   createdAt:  string;
 }
