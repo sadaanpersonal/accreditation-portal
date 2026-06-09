@@ -1,53 +1,146 @@
 "use client";
 import { useParams } from "next/navigation";
-import { useState } from "react";
-import { ChevronLeft } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronLeft, Loader, FileText } from "lucide-react";
 import Link from "next/link";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
 import { RoleTag } from "@/components/ui/RoleTag";
-import { ApprovalPipeline } from "@/components/shared/ApprovalPipeline";
+import { ApprovalPipeline, type PipelineState } from "@/components/shared/ApprovalPipeline";
 import { Modal } from "@/components/ui/Modal";
-import { REQUESTS, ADMIN_EXTRA_REQUESTS, type PipelineState, type PipelineStage } from "@/data/requests";
+import { requestsApi, pipelineApi, type RequestDto } from "@/lib/api";
 
-const all = [...REQUESTS, ...ADMIN_EXTRA_REQUESTS];
+function toPipelineState(req: RequestDto): PipelineState {
+  return {
+    currentStage: req.currentStage,
+    rejected: req.isRejected,
+    infoRequested: req.isInfoRequested,
+    infoNote: req.infoRequestNote,
+  };
+}
 
-function pipelineVariant(p: PipelineState): "approved" | "pending" | "rejected" | "review" {
-  if (p.currentStage === 5 && !p.rejected) return "approved";
-  if (p.rejected) return "rejected";
-  if (p.infoRequested) return "review";
+function pipelineVariant(req: RequestDto): "approved" | "pending" | "rejected" | "review" {
+  if (req.currentStage >= 5 && !req.isRejected) return "approved";
+  if (req.isRejected) return "rejected";
+  if (req.isInfoRequested) return "review";
   return "pending";
 }
 
+function fmtDate(iso?: string | null) {
+  if (!iso) return "—";
+  try { return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); }
+  catch { return iso; }
+}
+
+const STAGE_NAMES: Record<number, string> = {
+  1: "FA Owner", 2: "Zone Owner", 3: "Media Owner", 4: "MOI Clearance",
+};
+
 export default function AdminRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const found = all.find(r => r.id === id);
-  const [pipeline, setPipeline] = useState<PipelineState>(found?.pipeline ?? { currentStage: 1, rejected: false, infoRequested: false });
+  const [req, setReq] = useState<RequestDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [infoModal, setInfoModal] = useState(false);
   const [rejectModal, setRejectModal] = useState(false);
   const [infoNote, setInfoNote] = useState("");
   const [rejectNote, setRejectNote] = useState("");
+  const [zoneInput, setZoneInput] = useState("");
+  const [venueInput, setVenueInput] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  if (!found) return <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>Request not found.</div>;
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await requestsApi.get(id);
+      if (res.success && res.data) {
+        setReq(res.data);
+        setZoneInput(res.data.zoneAccess ?? "");
+        setVenueInput(res.data.assignedVenue ?? "");
+      } else {
+        setError(res.message ?? "Request not found.");
+      }
+    } catch {
+      setError("Failed to load request.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, [id]);
+
+  async function doReview(decision: string, notes?: string, extra?: { zoneAccess?: string; assignedVenue?: string }) {
+    if (!req) return;
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const res = await pipelineApi.review({ requestId: req.id, decision, notes, ...extra });
+      if (res.success && res.data) {
+        setReq(res.data);
+        setInfoModal(false);
+        setRejectModal(false);
+        setInfoNote("");
+        setRejectNote("");
+      } else {
+        setActionError(res.message ?? "Action failed.");
+      }
+    } catch {
+      setActionError("Action failed.");
+    } finally {
+      setActionLoading(false);
+    }
+  }
 
   function handleApprove() {
-    setPipeline(prev => {
-      const next = Math.min(prev.currentStage + 1, 5) as PipelineStage;
-      return { ...prev, currentStage: next, rejected: false, infoRequested: false, infoNote: undefined };
-    });
+    const extra = req?.currentStage === 2
+      ? { zoneAccess: zoneInput || undefined, assignedVenue: venueInput || undefined }
+      : undefined;
+    doReview("Approved", undefined, extra);
   }
 
-  function handleReject() {
-    setPipeline(prev => ({ ...prev, rejected: true }));
-    setRejectModal(false);
+  function handleReject()      { doReview("Rejected", rejectNote || undefined); }
+  function handleRequestInfo() { if (infoNote.trim()) doReview("RequestedInfo", infoNote); }
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 300, gap: 10, color: "var(--text-muted)" }}>
+        <Loader size={20} className="spin" /> Loading request…
+      </div>
+    );
   }
 
-  function handleRequestInfo() {
-    setPipeline(prev => ({ ...prev, infoRequested: true, infoNote }));
-    setInfoModal(false);
+  if (error || !req) {
+    return (
+      <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>
+        <p>{error ?? "Request not found."}</p>
+        <Link href="/admin/requests" style={{ color: "var(--gold)", fontSize: 13 }}>← Back to requests</Link>
+      </div>
+    );
   }
 
-  const isComplete = pipeline.currentStage === 5 && !pipeline.rejected;
+  const isComplete   = req.currentStage >= 5 && !req.isRejected;
+  const isTerminated = req.isRejected || isComplete;
+  const zones = req.zoneAccess ? req.zoneAccess.split(",").map(z => z.trim()).filter(Boolean) : [];
+
+  const zoneContent = req.currentStage === 2 && !isTerminated && !req.isInfoRequested ? (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <input
+        className="form-control form-control-sm"
+        placeholder="Zone access (e.g. Zone A, Zone B)"
+        value={zoneInput}
+        onChange={e => setZoneInput(e.target.value)}
+      />
+      <input
+        className="form-control form-control-sm"
+        placeholder="Assigned venue"
+        value={venueInput}
+        onChange={e => setVenueInput(e.target.value)}
+      />
+    </div>
+  ) : null;
 
   return (
     <div style={{ maxWidth: 940, margin: "0 auto" }}>
@@ -55,27 +148,40 @@ export default function AdminRequestDetailPage() {
         <Link href="/admin/requests" style={{ color: "var(--text-muted)", display: "flex" }}>
           <ChevronLeft size={20} />
         </Link>
-        <h1 style={{ fontSize: 20, fontWeight: 700, flex: 1 }}>{found.fullName}</h1>
-        <Badge variant={pipelineVariant(pipeline)} />
+        <div style={{ flex: 1 }}>
+          <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{req.fullName}</h1>
+          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>#{req.accreditationId} · {req.eventName}</span>
+        </div>
+        <Badge variant={pipelineVariant(req)} />
       </div>
+
+      {actionError && (
+        <div style={{ padding: "10px 14px", borderRadius: "var(--radius-sm)", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", color: "#EF4444", fontSize: 13, marginBottom: 16 }}>
+          {actionError}
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+          {/* Personal & Event Info */}
           <GlassCard>
             <CardHeader><h2 style={{ fontSize: 14, fontWeight: 600 }}>Personal Information</h2></CardHeader>
             <CardBody>
               <dl style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px", margin: 0 }}>
                 {[
-                  ["Full Name", found.fullName],
-                  ["Nationality", found.nationality],
-                  ["Passport No.", found.passportNo],
-                  ["Date of Birth", found.dob],
-                  ["Email", found.email],
-                  ["Phone", found.phone],
-                  ["Event", found.eventName],
-                  ["Venue", found.venue ?? "—"],
-                  ["Valid", `${found.validFrom} – ${found.validTo}`],
-                  ["Submitted", found.submittedDate],
+                  ["Full Name",     req.fullName],
+                  ["Nationality",   req.nationality],
+                  ["Passport No.",  req.passportNumber],
+                  ["Date of Birth", fmtDate(req.dateOfBirth)],
+                  ["Email",         req.email],
+                  ["Phone",         req.phone ?? "—"],
+                  ["Organization",  req.organization ?? "—"],
+                  ["Position",      req.position ?? "—"],
+                  ["Event",         req.eventName],
+                  ["Venue",         req.assignedVenue ?? "—"],
+                  ["Submitted",     fmtDate(req.createdAt)],
+                  ["Status",        req.status],
                 ].map(([k, v]) => (
                   <div key={k}>
                     <dt style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 2 }}>{k}</dt>
@@ -84,18 +190,19 @@ export default function AdminRequestDetailPage() {
                 ))}
                 <div>
                   <dt style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 2 }}>Role</dt>
-                  <dd style={{ margin: 0 }}><RoleTag role={found.role} /></dd>
+                  <dd style={{ margin: 0 }}><RoleTag role={req.role} /></dd>
                 </div>
               </dl>
             </CardBody>
           </GlassCard>
 
-          {found.zones && found.zones.length > 0 && (
+          {/* Zone Access */}
+          {zones.length > 0 && (
             <GlassCard>
               <CardHeader><h2 style={{ fontSize: 14, fontWeight: 600 }}>Zone Access</h2></CardHeader>
               <CardBody>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {found.zones.map(z => (
+                  {zones.map(z => (
                     <span key={z} style={{ padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 500, background: "rgba(201,168,76,0.12)", border: "1px solid rgba(201,168,76,0.3)", color: "var(--gold)" }}>{z}</span>
                   ))}
                 </div>
@@ -103,30 +210,82 @@ export default function AdminRequestDetailPage() {
             </GlassCard>
           )}
 
-          {found.documents.length > 0 && (
+          {/* Documents */}
+          {req.documents.length > 0 && (
             <GlassCard>
               <CardHeader><h2 style={{ fontSize: 14, fontWeight: 600 }}>Documents</h2></CardHeader>
               <CardBody style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {found.documents.map(doc => (
-                  <div key={doc.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", background: "var(--surface-3)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
-                    <span style={{ fontSize: 12, fontWeight: 500 }}>{doc.name}</span>
-                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{doc.size}</span>
+                {req.documents.map(doc => (
+                  <div key={doc.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", background: "var(--surface-3)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <FileText size={14} color="var(--text-muted)" />
+                      <span style={{ fontSize: 12, fontWeight: 500 }}>{doc.fileName}</span>
+                    </div>
+                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                      {doc.type} · {(doc.fileSizeBytes / 1024).toFixed(0)} KB
+                    </span>
                   </div>
                 ))}
               </CardBody>
             </GlassCard>
           )}
+
+          {/* Review History */}
+          {req.reviews.length > 0 && (
+            <GlassCard>
+              <CardHeader><h2 style={{ fontSize: 14, fontWeight: 600 }}>Review History</h2></CardHeader>
+              <CardBody style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {req.reviews.map(rv => (
+                  <div key={rv.id} style={{ padding: "10px 12px", background: "var(--surface-3)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600 }}>
+                        Stage {rv.stage} — {STAGE_NAMES[rv.stage] ?? `Stage ${rv.stage}`}
+                      </span>
+                      <span style={{ fontSize: 11, color: rv.decision === "Approved" ? "#22C55E" : rv.decision === "Rejected" ? "#EF4444" : "#F59E0B", fontWeight: 600 }}>
+                        {rv.decision}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                      By {rv.reviewerName} · {fmtDate(rv.reviewedAt)}
+                    </div>
+                    {rv.notes && (
+                      <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-primary)", lineHeight: 1.5 }}>{rv.notes}</p>
+                    )}
+                  </div>
+                ))}
+              </CardBody>
+            </GlassCard>
+          )}
+
+          {/* Rejection Reason */}
+          {req.isRejected && req.rejectionReason && (
+            <GlassCard>
+              <CardHeader>
+                <h2 style={{ fontSize: 14, fontWeight: 600, color: "#EF4444" }}>Rejection Reason</h2>
+              </CardHeader>
+              <CardBody>
+                <p style={{ color: "var(--text-primary)", lineHeight: 1.6, margin: 0 }}>{req.rejectionReason}</p>
+              </CardBody>
+            </GlassCard>
+          )}
         </div>
 
+        {/* Sidebar: Pipeline */}
         <GlassCard style={{ alignSelf: "flex-start" }}>
           <CardHeader><h2 style={{ fontSize: 14, fontWeight: 600 }}>Approval Pipeline</h2></CardHeader>
           <CardBody>
             <ApprovalPipeline
-              state={pipeline}
-              onApprove={!isComplete && !pipeline.rejected && !pipeline.infoRequested ? handleApprove : undefined}
-              onReject={!isComplete && !pipeline.rejected ? () => setRejectModal(true) : undefined}
-              onRequestInfo={!isComplete && !pipeline.rejected && !pipeline.infoRequested ? () => setInfoModal(true) : undefined}
+              state={toPipelineState(req)}
+              onApprove={!isTerminated && !req.isInfoRequested ? handleApprove : undefined}
+              onReject={!isTerminated ? () => setRejectModal(true) : undefined}
+              onRequestInfo={!isTerminated && !req.isInfoRequested ? () => setInfoModal(true) : undefined}
+              zoneContent={zoneContent}
             />
+            {actionLoading && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, justifyContent: "center", color: "var(--text-muted)", fontSize: 12 }}>
+                <Loader size={14} className="spin" /> Processing…
+              </div>
+            )}
             {isComplete && (
               <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: "var(--radius-sm)", background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)", fontSize: 12, color: "#22C55E", textAlign: "center" }}>
                 ✓ Accreditation fully approved
@@ -136,6 +295,7 @@ export default function AdminRequestDetailPage() {
         </GlassCard>
       </div>
 
+      {/* Request Info Modal */}
       <Modal open={infoModal} onClose={() => setInfoModal(false)} title="Request Additional Information">
         <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 14 }}>
           Describe what information you need from the requestor:
@@ -149,10 +309,14 @@ export default function AdminRequestDetailPage() {
         />
         <div style={{ display: "flex", gap: 10, marginTop: 14, justifyContent: "flex-end" }}>
           <button className="btn btn-secondary" onClick={() => setInfoModal(false)}>Cancel</button>
-          <button className="btn btn-warning" onClick={handleRequestInfo} disabled={!infoNote.trim()}>Send Request</button>
+          <button className="btn btn-warning" onClick={handleRequestInfo} disabled={!infoNote.trim() || actionLoading}>
+            {actionLoading ? <Loader size={13} className="spin" /> : null} Send Request
+          </button>
         </div>
+        {actionError && <p style={{ color: "#EF4444", fontSize: 12, marginTop: 8 }}>{actionError}</p>}
       </Modal>
 
+      {/* Reject Modal */}
       <Modal open={rejectModal} onClose={() => setRejectModal(false)} title="Reject Request">
         <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 14 }}>
           Provide a reason for rejection (optional):
@@ -166,8 +330,11 @@ export default function AdminRequestDetailPage() {
         />
         <div style={{ display: "flex", gap: 10, marginTop: 14, justifyContent: "flex-end" }}>
           <button className="btn btn-secondary" onClick={() => setRejectModal(false)}>Cancel</button>
-          <button className="btn btn-danger" onClick={handleReject}>Confirm Reject</button>
+          <button className="btn btn-danger" onClick={handleReject} disabled={actionLoading}>
+            {actionLoading ? <Loader size={13} className="spin" /> : null} Confirm Reject
+          </button>
         </div>
+        {actionError && <p style={{ color: "#EF4444", fontSize: 12, marginTop: 8 }}>{actionError}</p>}
       </Modal>
     </div>
   );

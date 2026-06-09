@@ -355,8 +355,8 @@ export const invitationsApi = {
   byToken: (token: string) =>
     request<InvitationDto>(`${V1}/invitations/accept/${token}`),
 
-  accept: (token: string, password: string) =>
-    request<boolean>(`${V1}/invitations/accept`, { method: "POST", body: JSON.stringify({ token, password }) }),
+  accept: (token: string, password: string, firstName: string, lastName: string) =>
+    request<boolean>(`${V1}/invitations/accept`, { method: "POST", body: JSON.stringify({ token, password, firstName, lastName }) }),
 
   revoke: (id: string) =>
     request<boolean>(`${V1}/invitations/${id}`, { method: "DELETE" }),

@@ -2,22 +2,24 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Plus, LayoutGrid, List, Shield, Loader, AlertCircle, RefreshCw } from "lucide-react";
-import { EventCard } from "@/components/shared/EventCard";
+import { EventCard, type EventCardData } from "@/components/shared/EventCard";
 import { CreateEventModal } from "@/components/shared/CreateEventModal";
 import { eventsApi, type EventDto } from "@/lib/api";
-import type { Event } from "@/data/events";
+
+const CARD_COLORS  = ["linear-gradient(135deg,#4A0A1E,#8B1A3A)","linear-gradient(135deg,#1A4A8A,#2060B0)","linear-gradient(135deg,#065F46,#059669)","linear-gradient(135deg,#4C1D95,#6D28D9)","linear-gradient(135deg,#78350F,#D97706)"];
+const CARD_ACCENTS = ["#C9A84C","#60A5FA","#34D399","#A78BFA","#F59E0B"];
 
 type View = "card" | "list";
 
-/** Map API EventDto → legacy Event shape expected by EventCard. */
-function toEventShape(dto: EventDto): Event {
+/** Map API EventDto → EventCardData shape expected by EventCard. */
+function toEventShape(dto: EventDto, idx: number): EventCardData {
   const statusMap: Record<string, "active" | "upcoming" | "completed"> = {
     Active:    "active",
     Draft:     "upcoming",
     Completed: "completed",
     Cancelled: "completed",
   };
-
+  const ci = idx % CARD_COLORS.length;
   return {
     id:             dto.id,
     name:           dto.name,
@@ -26,9 +28,8 @@ function toEventShape(dto: EventDto): Event {
     dates:          `${new Date(dto.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} – ${new Date(dto.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`,
     location:       [dto.venue, dto.location].filter(Boolean).join(", "),
     accreditations: dto.accreditations ?? 0,
-    icon:           "Calendar",
-    color:          "linear-gradient(135deg,#4A0A1E,#8B1A3A)",
-    accentColor:    "#C9A84C",
+    color:          CARD_COLORS[ci],
+    accentColor:    CARD_ACCENTS[ci],
   };
 }
 
@@ -59,13 +60,13 @@ export default function AdminEventsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  function handleCreated(event: Event) {
+  function handleCreated() {
     // Re-fetch after create so we get server-assigned ID / counts
     load();
     setModalOpen(false);
   }
 
-  const filtered   = events.map(toEventShape);
+  const filtered   = events.map((e, i) => toEventShape(e, i));
   const activeCount    = events.filter(e => e.status === "Active").length;
   const upcomingCount  = events.filter(e => e.status === "Draft").length;
   const completedCount = events.filter(e => e.status === "Completed" || e.status === "Cancelled").length;

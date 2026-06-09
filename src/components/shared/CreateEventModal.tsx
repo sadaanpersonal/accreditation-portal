@@ -2,13 +2,12 @@
 import { useState } from "react";
 import { X, Check, Calendar, MapPin, Shield, Palette, Tag, Loader } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { Event, EventStatus } from "@/data/events";
 import { eventsApi } from "@/lib/api";
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onCreate: (event: Event) => void;
+  onCreate: () => void;
 }
 
 const THEMES = [
@@ -18,12 +17,6 @@ const THEMES = [
   { label: "Pink",    color: "linear-gradient(135deg,#4A0A2E,#9B1A68)", accent: "#F472B6" },
   { label: "Teal",    color: "linear-gradient(135deg,#0F3A38,#1A6B68)", accent: "#2DD4BF" },
   { label: "Slate",   color: "linear-gradient(135deg,#1F2937,#374151)", accent: "#9CA3AF" },
-];
-
-const STATUS_OPTIONS: { value: EventStatus; label: string; color: string }[] = [
-  { value: "active",    label: "Active",    color: "#22C55E" },
-  { value: "upcoming",  label: "Upcoming",  color: "#F59E0B" },
-  { value: "completed", label: "Completed", color: "#6B7280" },
 ];
 
 function slugify(str: string) {
@@ -82,21 +75,7 @@ export function CreateEventModal({ open, onClose, onCreate }: Props) {
       setApiErr(res.message ?? res.errors?.[0] ?? "Failed to create event.");
       return;
     }
-    // Build the legacy Event shape for parent state
-    const dto = res.data;
-    const event: Event = {
-      id:             dto.id,
-      name:           dto.name,
-      status:         "upcoming",
-      moiRequired:    dto.moiRequired,
-      dates:          `${new Date(dto.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} – ${new Date(dto.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`,
-      location:       [dto.venue, dto.location].filter(Boolean).join(", "),
-      accreditations: 0,
-      icon:           "Calendar",
-      color:          theme.color,
-      accentColor:    theme.accent,
-    };
-    onCreate(event);
+    onCreate();
     setForm(EMPTY);
     setErrors({});
     setApiErr("");
