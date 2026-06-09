@@ -1,27 +1,39 @@
 "use client";
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, CheckCircle } from "lucide-react";
+import { ChevronLeft, CheckCircle, Loader, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
 import { VenueMap, VenueSelect } from "@/components/shared/VenueMap";
-import { EVENTS } from "@/data/events";
+import { requestsApi, eventsApi, type EventDto } from "@/lib/api";
 
 const ROLES = ["Athlete", "Media", "VIP", "Staff", "Official", "Coach"];
-const NATIONALITIES = ["Qatar", "Saudi Arabia", "UAE", "Bahrain", "Kuwait", "Oman", "Jordan", "Egypt", "Tunisia", "Morocco"];
+const NATIONALITIES = ["Qatar", "Saudi Arabia", "UAE", "Bahrain", "Kuwait", "Oman", "Jordan", "Egypt", "Tunisia", "Morocco", "Other"];
 
 export default function NewRequestPage() {
   const router = useRouter();
+  const [events,    setEvents]    = useState<EventDto[]>([]);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error,     setError]     = useState("");
+  const [createdId, setCreatedId] = useState("");
+
   const [form, setForm] = useState({
-    name: "", nationality: "", passportNo: "", dob: "",
+    firstName: "", lastName: "", nationality: "", passportNumber: "", dateOfBirth: "",
     role: "", eventId: "", venueId: "", zones: [] as string[],
-    phone: "", email: "", notes: "",
+    phone: "", email: "", organization: "", position: "", notes: "",
   });
 
-  function set(key: keyof typeof form, value: any) {
+  useEffect(() => {
+    eventsApi.list({ pageNumber: 1, pageSize: 50, status: "Active" }).then(res => {
+      if (res.success && res.data) setEvents(res.data.items);
+    });
+  }, []);
+
+  function set(key: keyof typeof form, value: unknown) {
     setForm(prev => ({ ...prev, [key]: value }));
-    if (key === "venueId") setForm(prev => ({ ...prev, venueId: value, zones: [] }));
+    if (key === "venueId") setForm(prev => ({ ...prev, venueId: value as string, zones: [] }));
   }
 
   function toggleZone(zid: string) {
@@ -31,8 +43,33 @@ export default function NewRequestPage() {
     }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError("");
+    setSubmitting(true);
+
+    const res = await requestsApi.create({
+      eventId:        form.eventId,
+      role:           form.role,
+      firstName:      form.firstName.trim(),
+      lastName:       form.lastName.trim(),
+      nationality:    form.nationality,
+      dateOfBirth:    form.dateOfBirth,
+      passportNumber: form.passportNumber.trim(),
+      email:          form.email.trim() || undefined,
+      phone:          form.phone.trim() || undefined,
+      organization:   form.organization.trim() || undefined,
+      position:       form.position.trim() || undefined,
+      assignedVenue:  form.venueId || undefined,
+      zoneAccess:     form.zones.join(", ") || undefined,
+    });
+
+    setSubmitting(false);
+    if (!res.success || !res.data) {
+      setError(res.message ?? res.errors?.[0] ?? "Failed to submit request.");
+      return;
+    }
+    setCreatedId(res.data.accreditationId || res.data.id);
     setSubmitted(true);
   }
 
@@ -43,12 +80,18 @@ export default function NewRequestPage() {
           <CheckCircle size={32} color="#22C55E" />
         </div>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Request Submitted!</h2>
-        <p style={{ color: "var(--text-muted)", marginBottom: 24 }}>
-          Your accreditation request for <strong>{form.name}</strong> has been submitted and is now pending FA Owner approval.
+        <p style={{ color: "var(--text-muted)", marginBottom: 4 }}>
+          Your accreditation request for <strong>{form.firstName} {form.lastName}</strong> has been submitted.
         </p>
+        {createdId && (
+          <p style={{ fontFamily: "monospace", fontSize: 12, color: "var(--gold)", marginBottom: 20 }}>
+            ID: {createdId}
+          </p>
+        )}
+        <p style={{ color: "var(--text-muted)", marginBottom: 24 }}>It is now pending FA Owner approval.</p>
         <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-          <button className="btn btn-secondary" onClick={() => setSubmitted(false)}>Submit Another</button>
-          <Link href="/requestor/requests" className="btn btn-primary">View All Requests</Link>
+          <button className="btn btn-secondary" onClick={() => { setSubmitted(false); setForm({ firstName: "", lastName: "", nationality: "", passportNumber: "", dateOfBirth: "", role: "", eventId: "", venueId: "", zones: [], phone: "", email: "", organization: "", position: "", notes: "" }); }}>Submit Another</button>
+          <Link href="/requestor/requests" className="btn btn-primary">View My Requests</Link>
         </div>
       </div>
     );
@@ -63,14 +106,24 @@ export default function NewRequestPage() {
         <h1 style={{ fontSize: 20, fontWeight: 700 }}>New Accreditation Request</h1>
       </div>
 
+      {error && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", marginBottom: 16, background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 10, color: "#F87171" }}>
+          <AlertCircle size={15} /> {error}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <GlassCard>
           <CardHeader><h2 style={{ fontSize: 14, fontWeight: 600 }}>Personal Information</h2></CardHeader>
           <CardBody>
             <div className="form-grid">
               <div className="form-group">
-                <label className="form-label">Full Name *</label>
-                <input className="form-control" required placeholder="As on passport" value={form.name} onChange={e => set("name", e.target.value)} />
+                <label className="form-label">First Name *</label>
+                <input className="form-control" required placeholder="As on passport" value={form.firstName} onChange={e => set("firstName", e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Last Name *</label>
+                <input className="form-control" required placeholder="As on passport" value={form.lastName} onChange={e => set("lastName", e.target.value)} />
               </div>
               <div className="form-group">
                 <label className="form-label">Nationality *</label>
@@ -81,11 +134,11 @@ export default function NewRequestPage() {
               </div>
               <div className="form-group">
                 <label className="form-label">Passport Number *</label>
-                <input className="form-control" required placeholder="e.g. QA1234567" value={form.passportNo} onChange={e => set("passportNo", e.target.value)} />
+                <input className="form-control" required placeholder="e.g. QA1234567" value={form.passportNumber} onChange={e => set("passportNumber", e.target.value)} />
               </div>
               <div className="form-group">
                 <label className="form-label">Date of Birth *</label>
-                <input className="form-control" type="date" required value={form.dob} onChange={e => set("dob", e.target.value)} />
+                <input className="form-control" type="date" required value={form.dateOfBirth} onChange={e => set("dateOfBirth", e.target.value)} />
               </div>
               <div className="form-group">
                 <label className="form-label">Email</label>
@@ -94,6 +147,14 @@ export default function NewRequestPage() {
               <div className="form-group">
                 <label className="form-label">Phone</label>
                 <input className="form-control" placeholder="Optional" value={form.phone} onChange={e => set("phone", e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Organization</label>
+                <input className="form-control" placeholder="Optional" value={form.organization} onChange={e => set("organization", e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Position / Title</label>
+                <input className="form-control" placeholder="Optional" value={form.position} onChange={e => set("position", e.target.value)} />
               </div>
             </div>
           </CardBody>
@@ -114,11 +175,11 @@ export default function NewRequestPage() {
                 <label className="form-label">Event *</label>
                 <select className="form-control" required value={form.eventId} onChange={e => set("eventId", e.target.value)}>
                   <option value="">Select event</option>
-                  {EVENTS.filter(e => e.status === "active").map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                  {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
                 </select>
               </div>
               <div className="form-group" style={{ gridColumn: "1 / -1" }}>
-                <label className="form-label">Venue</label>
+                <label className="form-label">Venue (optional)</label>
                 <VenueSelect value={form.venueId} onChange={v => set("venueId", v)} />
               </div>
             </div>
@@ -139,9 +200,14 @@ export default function NewRequestPage() {
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <Link href="/requestor/requests" className="btn btn-secondary">Cancel</Link>
-          <button type="submit" className="btn btn-primary">Submit Request</button>
+          <button type="submit" className="btn btn-primary" disabled={submitting} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {submitting && <Loader size={15} style={{ animation: "spin 1s linear infinite" }} />}
+            {submitting ? "Submitting…" : "Submit Request"}
+          </button>
         </div>
       </form>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

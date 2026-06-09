@@ -12,7 +12,7 @@ interface Props {
   zones: string[];
   accId: string;
   issuedDate: string;
-  qrSeed: number;
+  qrSeed: number | string;
   style?: React.CSSProperties;
   roleStyle?: React.CSSProperties;
   expired?: boolean;

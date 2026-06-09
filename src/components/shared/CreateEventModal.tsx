@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
-import { X, Check, Calendar, MapPin, Shield, Palette, Tag } from "lucide-react";
+import { X, Check, Calendar, MapPin, Shield, Palette, Tag, Loader } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Event, EventStatus } from "@/data/events";
+import { eventsApi } from "@/lib/api";
 
 interface Props {
   open: boolean;
@@ -31,36 +32,65 @@ function slugify(str: string) {
 
 const EMPTY = {
   name: "",
-  dates: "",
+  startDate: "",
+  endDate: "",
+  venue: "",
   location: "",
-  status: "upcoming" as EventStatus,
+  eventCode: "",
+  description: "",
+  status: "Draft" as string,
   moiRequired: false,
   themeIdx: 0,
 };
 
 export function CreateEventModal({ open, onClose, onCreate }: Props) {
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm]     = useState(EMPTY);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [apiErr, setApiErr] = useState("");
 
   function validate() {
     const e: Record<string, string> = {};
-    if (!form.name.trim())     e.name     = "Event name is required";
-    if (!form.dates.trim())    e.dates    = "Dates are required";
-    if (!form.location.trim()) e.location = "Location is required";
+    if (!form.name.trim())      e.name      = "Event name is required";
+    if (!form.startDate.trim()) e.startDate = "Start date is required";
+    if (!form.endDate.trim())   e.endDate   = "End date is required";
+    if (!form.venue.trim())     e.venue     = "Venue is required";
+    if (!form.eventCode.trim()) e.eventCode = "Event code (e.g. GAC) is required";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!validate()) return;
+    setSaving(true);
+    setApiErr("");
     const theme = THEMES[form.themeIdx];
+    const res = await eventsApi.create({
+      name:        form.name.trim(),
+      description: form.description.trim() || undefined,
+      startDate:   form.startDate,
+      endDate:     form.endDate,
+      venue:       form.venue.trim(),
+      location:    form.location.trim() || undefined,
+      eventCode:   form.eventCode.trim().toUpperCase(),
+      status:      form.status,
+      moiRequired: form.moiRequired,
+      theme:       theme.label,
+    });
+    setSaving(false);
+    if (!res.success || !res.data) {
+      setApiErr(res.message ?? res.errors?.[0] ?? "Failed to create event.");
+      return;
+    }
+    // Build the legacy Event shape for parent state
+    const dto = res.data;
     const event: Event = {
-      id:             slugify(form.name) || `event-${Date.now()}`,
-      name:           form.name.trim(),
-      status:         form.status,
-      moiRequired:    form.moiRequired,
-      dates:          form.dates.trim(),
-      location:       form.location.trim(),
+      id:             dto.id,
+      name:           dto.name,
+      status:         "upcoming",
+      moiRequired:    dto.moiRequired,
+      dates:          `${new Date(dto.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} – ${new Date(dto.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`,
+      location:       [dto.venue, dto.location].filter(Boolean).join(", "),
       accreditations: 0,
       icon:           "Calendar",
       color:          theme.color,
@@ -69,12 +99,14 @@ export function CreateEventModal({ open, onClose, onCreate }: Props) {
     onCreate(event);
     setForm(EMPTY);
     setErrors({});
+    setApiErr("");
     onClose();
   }
 
   function handleClose() {
     setForm(EMPTY);
     setErrors({});
+    setApiErr("");
     onClose();
   }
 
@@ -143,59 +175,62 @@ export function CreateEventModal({ open, onClose, onCreate }: Props) {
             {/* Body */}
             <div style={{ padding: "22px", display: "flex", flexDirection: "column", gap: 18, maxHeight: "calc(100vh - 200px)", overflowY: "auto" }}>
 
+              {/* API Error */}
+              {apiErr && (
+                <div style={{ fontSize: 12, color: "#F87171", padding: "8px 12px", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 8 }}>
+                  {apiErr}
+                </div>
+              )}
+
               {/* Event Name */}
               <Field label="Event Name" error={errors.name}>
                 <div style={{ position: "relative" }}>
                   <Tag size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
-                  <input
-                    className="form-control"
-                    style={{ paddingLeft: 34 }}
-                    placeholder="e.g. Gulf Athletics Championship 2027"
-                    value={form.name}
-                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  />
+                  <input className="form-control" style={{ paddingLeft: 34 }} placeholder="e.g. Gulf Athletics Championship 2027" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
                 </div>
               </Field>
 
-              {/* Dates */}
-              <Field label="Dates" error={errors.dates}>
-                <div style={{ position: "relative" }}>
-                  <Calendar size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
-                  <input
-                    className="form-control"
-                    style={{ paddingLeft: 34 }}
-                    placeholder="e.g. 1 Jun – 15 Jun 2027"
-                    value={form.dates}
-                    onChange={e => setForm(f => ({ ...f, dates: e.target.value }))}
-                  />
-                </div>
-              </Field>
+              {/* Event Code + Dates */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+                <Field label="Event Code" error={errors.eventCode}>
+                  <input className="form-control" placeholder="e.g. GAC" maxLength={10} value={form.eventCode} onChange={e => setForm(f => ({ ...f, eventCode: e.target.value.toUpperCase() }))} />
+                </Field>
+                <Field label="Start Date" error={errors.startDate}>
+                  <input className="form-control" type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} />
+                </Field>
+                <Field label="End Date" error={errors.endDate}>
+                  <input className="form-control" type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} />
+                </Field>
+              </div>
 
-              {/* Location */}
-              <Field label="Location / Venue" error={errors.location}>
+              {/* Venue */}
+              <Field label="Venue" error={errors.venue}>
                 <div style={{ position: "relative" }}>
                   <MapPin size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
-                  <input
-                    className="form-control"
-                    style={{ paddingLeft: 34 }}
-                    placeholder="e.g. Khalifa International Stadium, Doha"
-                    value={form.location}
-                    onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
-                  />
+                  <input className="form-control" style={{ paddingLeft: 34 }} placeholder="e.g. Khalifa International Stadium" value={form.venue} onChange={e => setForm(f => ({ ...f, venue: e.target.value }))} />
                 </div>
+              </Field>
+
+              {/* Location (city) */}
+              <Field label="City / Location" error={errors.location}>
+                <div style={{ position: "relative" }}>
+                  <Calendar size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
+                  <input className="form-control" style={{ paddingLeft: 34 }} placeholder="e.g. Doha, Qatar" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} />
+                </div>
+              </Field>
+
+              {/* Description */}
+              <Field label="Description (optional)" error="">
+                <textarea className="form-control" rows={2} placeholder="Short description of the event…" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} style={{ resize: "vertical" }} />
               </Field>
 
               {/* Status + MOI row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <Field label="Status">
-                  <select
-                    className="form-control"
-                    value={form.status}
-                    onChange={e => setForm(f => ({ ...f, status: e.target.value as EventStatus }))}
-                  >
-                    {STATUS_OPTIONS.map(s => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
-                    ))}
+                  <select className="form-control" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                    <option value="Draft">Upcoming (Draft)</option>
+                    <option value="Active">Active</option>
+                    <option value="Completed">Completed</option>
                   </select>
                 </Field>
 
@@ -269,14 +304,19 @@ export function CreateEventModal({ open, onClose, onCreate }: Props) {
               borderTop: "1px solid var(--border)",
               background: "var(--surface-2)",
             }}>
-              <button className="btn btn-secondary btn-sm" onClick={handleClose}>Cancel</button>
+              <button className="btn btn-secondary btn-sm" onClick={handleClose} disabled={saving}>Cancel</button>
               <button
                 className="btn btn-primary btn-sm"
                 onClick={handleSubmit}
+                disabled={saving}
                 style={{ display: "flex", alignItems: "center", gap: 6 }}
               >
-                <Check size={13} /> Create Event
+                {saving
+                  ? <><Loader size={13} style={{ animation: "spin 1s linear infinite" }} /> Saving…</>
+                  : <><Check size={13} /> Create Event</>
+                }
               </button>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </div>
           </motion.div>
         </motion.div>

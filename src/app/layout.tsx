@@ -2,6 +2,7 @@
 import "./globals.css";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -17,12 +18,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ThemeProvider>
           <LanguageProvider>
-            <div className="bg-canvas">
-              <div className="bg-orb bg-orb-1" />
-              <div className="bg-orb bg-orb-2" />
-              <div className="bg-orb bg-orb-3" />
-            </div>
-            {children}
+            <AuthProvider>
+              <div className="bg-canvas">
+                <div className="bg-orb bg-orb-1" />
+                <div className="bg-orb bg-orb-2" />
+                <div className="bg-orb bg-orb-3" />
+              </div>
+              {children}
+            </AuthProvider>
           </LanguageProvider>
         </ThemeProvider>
       </body>

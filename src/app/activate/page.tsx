@@ -1,27 +1,56 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Eye, EyeOff, CheckCircle } from "lucide-react";
 
-export default function ActivatePage() {
-  const router = useRouter();
-  const [step, setStep] = useState<"verify" | "set-password" | "done">("verify");
-  const [code, setCode] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [showPw, setShowPw] = useState(false);
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Eye, EyeOff, CheckCircle, Loader, AlertCircle } from "lucide-react";
+import { invitationsApi } from "@/lib/api";
 
-  const token = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("token") : "";
+function ActivateContent() {
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+  const token        = searchParams.get("token") ?? "";
 
-  function handleVerify(e: React.FormEvent) {
-    e.preventDefault();
-    setStep("set-password");
-  }
+  const [step,      setStep]      = useState<"set-password" | "done">("set-password");
+  const [password,  setPassword]  = useState("");
+  const [confirm,   setConfirm]   = useState("");
+  const [showPw,    setShowPw]    = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error,     setError]     = useState("");
+  const [email,     setEmail]     = useState("");
 
-  function handleSetPassword(e: React.FormEvent) {
+  // Fetch invitation details to show the email
+  useEffect(() => {
+    if (!token) return;
+    invitationsApi.byToken(token).then(res => {
+      if (res.success && res.data) setEmail(res.data.email);
+    });
+  }, [token]);
+
+  async function handleSetPassword(e: React.FormEvent) {
     e.preventDefault();
     if (password !== confirm) return;
-    setStep("done");
+    if (!token) { setError("Invalid or missing invitation token."); return; }
+
+    setError("");
+    setSubmitting(true);
+    const res = await invitationsApi.accept(token, password);
+    setSubmitting(false);
+
+    if (res.success) {
+      setStep("done");
+    } else {
+      setError(res.message ?? res.errors?.[0] ?? "Activation failed. The link may have expired.");
+    }
+  }
+
+  if (!token) {
+    return (
+      <div style={{ textAlign: "center", padding: "60px 24px", color: "var(--text-muted)" }}>
+        <AlertCircle size={32} style={{ margin: "0 auto 12px", display: "block", color: "#F87171" }} />
+        <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Invalid Invitation Link</h2>
+        <p style={{ fontSize: 13 }}>The link appears to be missing a token. Please check your email.</p>
+      </div>
+    );
   }
 
   return (
@@ -33,35 +62,22 @@ export default function ActivatePage() {
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Activate Account</h1>
           <p style={{ fontSize: 13, color: "var(--text-muted)" }}>Qatar Olympic Committee · Accreditation Portal</p>
+          {email && <p style={{ fontSize: 12, color: "var(--gold)", marginTop: 6 }}>{email}</p>}
         </div>
 
         <div className="glass-card" style={{ padding: "28px 24px" }}>
-          {step === "verify" && (
-            <form onSubmit={handleVerify} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
-                Enter the 6-digit verification code sent to your email.
-              </p>
-              <div className="form-group">
-                <label className="form-label">Verification Code</label>
-                <input
-                  className="form-control"
-                  required
-                  maxLength={6}
-                  placeholder="123456"
-                  value={code}
-                  onChange={e => setCode(e.target.value.replace(/\D/g, ""))}
-                  style={{ fontSize: 22, letterSpacing: "0.3em", textAlign: "center", fontFamily: "var(--font-mono)" }}
-                />
-              </div>
-              <button type="submit" className="btn btn-primary" disabled={code.length < 6}>
-                Verify Code
-              </button>
-            </form>
-          )}
-
           {step === "set-password" && (
             <form onSubmit={handleSetPassword} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>Set your account password.</p>
+              <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
+                Choose a secure password for your new account.
+              </p>
+
+              {error && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 10, fontSize: 13, color: "#F87171" }}>
+                  <AlertCircle size={14} /> {error}
+                </div>
+              )}
+
               <div className="form-group">
                 <label className="form-label">New Password</label>
                 <div style={{ position: "relative" }}>
@@ -78,8 +94,8 @@ export default function ActivatePage() {
                   <p style={{ fontSize: 11, color: "#F87171", marginTop: 4 }}>Passwords do not match</p>
                 )}
               </div>
-              <button type="submit" className="btn btn-primary" disabled={!password || password !== confirm}>
-                Set Password & Activate
+              <button type="submit" className="btn btn-primary" disabled={!password || password !== confirm || submitting} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                {submitting ? <><Loader size={15} style={{ animation: "spin 1s linear infinite" }} /> Activating…</> : "Set Password & Activate"}
               </button>
             </form>
           )}
@@ -90,7 +106,7 @@ export default function ActivatePage() {
                 <CheckCircle size={28} color="#22C55E" />
               </div>
               <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 8 }}>Account Activated!</h2>
-              <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20 }}>Your account is ready. You can now sign in.</p>
+              <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20 }}>Your account is ready. Sign in to get started.</p>
               <button className="btn btn-primary" style={{ width: "100%" }} onClick={() => router.push("/login")}>
                 Go to Login
               </button>
@@ -98,6 +114,16 @@ export default function ActivatePage() {
           )}
         </div>
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
+  );
+}
+
+export default function ActivatePage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>Loading…</div>}>
+      <ActivateContent />
+    </Suspense>
   );
 }

@@ -1,7 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface NavItem {
   label: string;
@@ -27,7 +29,8 @@ interface Props {
 }
 
 export function Sidebar({ sections, open, onClose, userName, userRole, userInitials, brandTitle, brandSub }: Props) {
-  const pathname = usePathname();
+  const pathname  = usePathname();
+  const { logout } = useAuth();
 
   // Most-specific match wins: /admin/requests/new should not also highlight /admin/requests
   const allItems = sections.flatMap(s => s.items);
@@ -100,6 +103,13 @@ export function Sidebar({ sections, open, onClose, userName, userRole, userIniti
               <strong>{userName}</strong>
               <span>{userRole}</span>
             </div>
+            <button
+              onClick={logout}
+              title="Sign out"
+              style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", color: "var(--text-muted)", display: "flex", borderRadius: 6, flexShrink: 0 }}
+            >
+              <LogOut size={15} />
+            </button>
           </div>
         </div>
       </aside>

@@ -1,4 +1,5 @@
 "use client";
+
 import {
   LayoutDashboard, PlusCircle, Upload, FolderOpen,
   ClipboardCheck, Send, CalendarDays, Users,
@@ -6,13 +7,7 @@ import {
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import type { NavSection } from "@/components/layout/Sidebar";
-import { REQUESTS, ADMIN_EXTRA_REQUESTS } from "@/data/requests";
-
-// Compute live badge counts from data
-const allRequests = [...REQUESTS, ...ADMIN_EXTRA_REQUESTS];
-const reviewCount = allRequests.filter(
-  r => !r.pipeline.rejected && r.pipeline.currentStage < 5
-).length;
+import { useAuth } from "@/contexts/AuthContext";
 
 const NAV: NavSection[] = [
   {
@@ -24,11 +19,11 @@ const NAV: NavSection[] = [
   {
     label: "Accreditation",
     items: [
-      { label: "New Request",   href: "/admin/requests/new", icon: <PlusCircle size={16} /> },
-      { label: "Bulk Upload",   href: "/admin/bulk-upload",  icon: <Upload size={16} /> },
-      { label: "All Requests",  href: "/admin/requests",     icon: <FolderOpen size={16} />,     badge: allRequests.length },
-      { label: "Review Queue",  href: "/admin/review",       icon: <ClipboardCheck size={16} />, badge: reviewCount },
-      { label: "Invitations",   href: "/admin/invitations",  icon: <Send size={16} /> },
+      { label: "New Request",  href: "/admin/requests/new", icon: <PlusCircle size={16} /> },
+      { label: "Bulk Upload",  href: "/admin/bulk-upload",  icon: <Upload size={16} /> },
+      { label: "All Requests", href: "/admin/requests",     icon: <FolderOpen size={16} /> },
+      { label: "Review Queue", href: "/admin/review",       icon: <ClipboardCheck size={16} /> },
+      { label: "Invitations",  href: "/admin/invitations",  icon: <Send size={16} /> },
     ],
   },
   {
@@ -48,12 +43,22 @@ const NAV: NavSection[] = [
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+
+  const fullName = user ? `${user.firstName} ${user.lastName}`.trim() || user.email : "Admin";
+  const initials = user
+    ? ((user.firstName?.[0] ?? "") + (user.lastName?.[0] ?? "")).toUpperCase() || "A"
+    : "A";
+  const roleLabel = user
+    ? user.role.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+    : "Admin";
+
   return (
     <AppLayout
       navSections={NAV}
-      userName="Fatima Al-Kuwari"
-      userRole="Admin · QOC Accreditation"
-      userInitials="FK"
+      userName={fullName}
+      userRole={`${roleLabel} · QOC Accreditation`}
+      userInitials={initials}
       brandTitle="QOC Admin"
       brandSub="Accreditation Management"
       topbarTitle="Admin Panel"

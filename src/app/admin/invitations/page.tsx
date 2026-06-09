@@ -1,173 +1,224 @@
 "use client";
-import { useState } from "react";
-import { Send, Plus, Copy, Check, Mail, Clock, CheckCircle2, XCircle } from "lucide-react";
+
+import { useEffect, useState, useCallback } from "react";
+import { Send, Copy, Check, Mail, Clock, CheckCircle2, XCircle, Loader, RefreshCw, Trash2 } from "lucide-react";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
-
-interface Invitation {
-  id: string;
-  email: string;
-  role: string;
-  event: string;
-  sentDate: string;
-  status: "pending" | "accepted" | "expired";
-}
-
-const SAMPLE: Invitation[] = [
-  { id: "inv-1", email: "ahmed.rashid@gulf-athletics.qa", role: "Requestor", event: "Gulf Athletics Championship 2026", sentDate: "28 May 2026", status: "pending" },
-  { id: "inv-2", email: "sara.almansouri@qoc.qa",         role: "Admin",     event: "Asian Games 2026 — Doha",         sentDate: "22 May 2026", status: "accepted" },
-  { id: "inv-3", email: "khalid.hamed@mediaqatar.qa",     role: "Requestor", event: "Gulf Athletics Championship 2026", sentDate: "10 May 2026", status: "expired" },
-  { id: "inv-4", email: "noor.ali@asianoc.org",           role: "Requestor", event: "Asian Games 2026 — Doha",         sentDate: "2 Jun 2026",  status: "pending" },
-];
+import { invitationsApi, eventsApi, type InvitationDto, type EventDto } from "@/lib/api";
 
 const STATUS_STYLE = {
-  pending:  { color: "#F59E0B", bg: "rgba(245,158,11,0.1)",  border: "rgba(245,158,11,0.3)",  icon: Clock,          label: "Pending" },
-  accepted: { color: "#22C55E", bg: "rgba(34,197,94,0.1)",   border: "rgba(34,197,94,0.3)",   icon: CheckCircle2,   label: "Accepted" },
-  expired:  { color: "#6B7280", bg: "rgba(107,114,128,0.1)", border: "rgba(107,114,128,0.3)", icon: XCircle,        label: "Expired" },
-};
+  Pending:  { color: "#F59E0B", bg: "rgba(245,158,11,0.1)",  border: "rgba(245,158,11,0.3)",  icon: Clock,        label: "Pending" },
+  Accepted: { color: "#22C55E", bg: "rgba(34,197,94,0.1)",   border: "rgba(34,197,94,0.3)",   icon: CheckCircle2, label: "Accepted" },
+  Expired:  { color: "#6B7280", bg: "rgba(107,114,128,0.1)", border: "rgba(107,114,128,0.3)", icon: XCircle,      label: "Expired" },
+  Revoked:  { color: "#F87171", bg: "rgba(248,113,113,0.1)", border: "rgba(248,113,113,0.3)", icon: XCircle,      label: "Revoked" },
+} as const;
+
+type InvStatus = keyof typeof STATUS_STYLE;
 
 export default function InvitationsPage() {
-  const [invitations, setInvitations] = useState<Invitation[]>(SAMPLE);
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState("Requestor");
-  const [event, setEvent] = useState("Gulf Athletics Championship 2026");
-  const [copied, setCopied] = useState<string | null>(null);
+  const [items,      setItems]      = useState<InvitationDto[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState("");
+  const [events,     setEvents]     = useState<EventDto[]>([]);
+  const [copied,     setCopied]     = useState<string | null>(null);
+  const [sending,    setSending]    = useState(false);
+  const [sendError,  setSendError]  = useState("");
+  const [page,       setPage]       = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
-  function handleSend() {
+  // Send-form state
+  const [email,      setEmail]      = useState("");
+  const [role,       setRole]       = useState("REQUESTOR");
+  const [eventId,    setEventId]    = useState("");
+  const [message,    setMessage]    = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    const res = await invitationsApi.list({ pageNumber: page, pageSize: 20 });
+    setLoading(false);
+    if (res.success && res.data) {
+      setItems(res.data.items);
+      setTotalPages(res.data.totalPages);
+      setTotalCount(res.data.totalCount);
+    } else {
+      setError(res.message ?? "Failed to load invitations.");
+    }
+  }, [page]);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    eventsApi.list({ pageNumber: 1, pageSize: 100 }).then(res => {
+      if (res.success && res.data) setEvents(res.data.items);
+    });
+  }, []);
+
+  async function handleSend() {
     if (!email.trim()) return;
-    const inv: Invitation = {
-      id: `inv-${Date.now()}`,
-      email: email.trim(),
-      role,
-      event,
-      sentDate: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
-      status: "pending",
-    };
-    setInvitations(prev => [inv, ...prev]);
-    setEmail("");
+    setSending(true);
+    setSendError("");
+    const res = await invitationsApi.send({
+      email:           email.trim(),
+      suggestedRole:   role,
+      eventId:         eventId || undefined,
+      personalMessage: message.trim() || undefined,
+      expiryDays:      7,
+    });
+    setSending(false);
+    if (res.success) {
+      setEmail(""); setMessage("");
+      load();
+    } else {
+      setSendError(res.message ?? res.errors?.[0] ?? "Failed to send.");
+    }
   }
 
-  function copyLink(id: string) {
-    navigator.clipboard.writeText(`https://accreditation.qoc.qa/invite/${id}`).catch(() => {});
-    setCopied(id);
+  async function handleRevoke(id: string) {
+    if (!confirm("Revoke this invitation?")) return;
+    await invitationsApi.revoke(id);
+    load();
+  }
+
+  function copyLink(inv: InvitationDto) {
+    const link = inv.inviteLink || `${window.location.origin}/activate?token=${inv.id}`;
+    navigator.clipboard.writeText(link).catch(() => {});
+    setCopied(inv.id);
     setTimeout(() => setCopied(null), 1500);
   }
 
-  const pendingCount  = invitations.filter(i => i.status === "pending").length;
-  const acceptedCount = invitations.filter(i => i.status === "accepted").length;
+  const pendingCount  = items.filter(i => i.status === "Pending").length;
+  const acceptedCount = items.filter(i => i.status === "Accepted").length;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div>
-        <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Invitations</h1>
-        <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "3px 0 0" }}>
-          {invitations.length} sent · {pendingCount} pending · {acceptedCount} accepted
-        </p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Invitations</h1>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "3px 0 0" }}>
+            {totalCount} sent · {pendingCount} pending · {acceptedCount} accepted
+          </p>
+        </div>
+        <button className="btn btn-secondary btn-sm" onClick={load} title="Refresh"><RefreshCw size={14} /></button>
       </div>
 
-      {/* Send invite */}
+      {/* Send invite form */}
       <GlassCard>
         <CardHeader><h2 style={{ fontSize: 14, fontWeight: 600 }}>Send Invitation</h2></CardHeader>
         <CardBody>
+          {sendError && (
+            <div style={{ fontSize: 12, color: "#F87171", padding: "8px 12px", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 8, marginBottom: 12 }}>
+              {sendError}
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Email Address</label>
               <div style={{ position: "relative" }}>
                 <Mail size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
-                <input
-                  className="form-control"
-                  style={{ paddingLeft: 32, margin: 0 }}
-                  type="email"
-                  placeholder="user@organisation.qa"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && handleSend()}
-                />
+                <input className="form-control" style={{ paddingLeft: 32, margin: 0 }} type="email" placeholder="user@organisation.qa" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} />
               </div>
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Role</label>
               <select className="form-control" style={{ margin: 0 }} value={role} onChange={e => setRole(e.target.value)}>
-                <option>Requestor</option>
-                <option>Admin</option>
-                <option>FA Owner</option>
-                <option>Zone Owner</option>
-                <option>Media Owner</option>
+                <option value="REQUESTOR">Requestor</option>
+                <option value="FA_OWNER">FA Owner</option>
+                <option value="ZONE_OWNER">Zone Owner</option>
+                <option value="MEDIA_OWNER">Media Owner</option>
+                <option value="MOI_OFFICER">MOI Officer</option>
               </select>
             </div>
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Event</label>
-              <select className="form-control" style={{ margin: 0 }} value={event} onChange={e => setEvent(e.target.value)}>
-                <option>Gulf Athletics Championship 2026</option>
-                <option>Asian Games 2026 — Doha</option>
-                <option>FIFA World Cup 2030 Qualifier</option>
+              <label className="form-label">Event (optional)</label>
+              <select className="form-control" style={{ margin: 0 }} value={eventId} onChange={e => setEventId(e.target.value)}>
+                <option value="">— No specific event —</option>
+                {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
               </select>
             </div>
-            <button
-              className="btn btn-primary btn-sm"
-              style={{ display: "flex", alignItems: "center", gap: 6, alignSelf: "flex-end", height: 42 }}
-              onClick={handleSend}
-              disabled={!email.trim()}
-            >
-              <Send size={13} /> Send
+            <button className="btn btn-primary btn-sm" style={{ display: "flex", alignItems: "center", gap: 6, alignSelf: "flex-end", height: 42 }} onClick={handleSend} disabled={!email.trim() || sending}>
+              {sending ? <Loader size={13} style={{ animation: "spin 1s linear infinite" }} /> : <Send size={13} />}
+              Send
             </button>
           </div>
         </CardBody>
       </GlassCard>
 
-      {/* Invite list */}
+      {/* List */}
       <GlassCard>
         <CardHeader><h2 style={{ fontSize: 14, fontWeight: 600 }}>Sent Invitations</h2></CardHeader>
         <CardBody style={{ padding: 0 }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Event</th>
-                <th>Sent</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {invitations.map(inv => {
-                const s = STATUS_STYLE[inv.status];
-                const Icon = s.icon;
-                return (
-                  <tr key={inv.id}>
-                    <td style={{ fontWeight: 500, fontSize: 13 }}>{inv.email}</td>
-                    <td style={{ fontSize: 12 }}>{inv.role}</td>
-                    <td style={{ fontSize: 12, color: "var(--text-muted)" }}>{inv.event}</td>
-                    <td style={{ fontSize: 12, color: "var(--text-muted)" }}>{inv.sentDate}</td>
-                    <td>
-                      <span style={{
-                        display: "inline-flex", alignItems: "center", gap: 5,
-                        fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20,
-                        background: s.bg, border: `1px solid ${s.border}`, color: s.color,
-                      }}>
-                        <Icon size={11} />
-                        {s.label}
-                      </span>
-                    </td>
-                    <td>
-                      {inv.status === "pending" && (
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          style={{ display: "flex", alignItems: "center", gap: 5 }}
-                          onClick={() => copyLink(inv.id)}
-                        >
-                          {copied === inv.id ? <Check size={12} /> : <Copy size={12} />}
-                          {copied === inv.id ? "Copied" : "Copy link"}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          {loading ? (
+            <div style={{ display: "flex", justifyContent: "center", padding: "48px 24px", color: "var(--text-muted)", gap: 10 }}>
+              <Loader size={18} style={{ animation: "spin 1s linear infinite" }} /> Loading…
+            </div>
+          ) : error ? (
+            <div style={{ padding: 24, color: "#F87171", textAlign: "center" }}>{error}</div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Event</th>
+                  <th>Sent</th>
+                  <th>Expires</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map(inv => {
+                  const st = STATUS_STYLE[(inv.status as InvStatus)] ?? STATUS_STYLE.Pending;
+                  const Icon = st.icon;
+                  return (
+                    <tr key={inv.id}>
+                      <td style={{ fontWeight: 500, fontSize: 13 }}>{inv.email}</td>
+                      <td style={{ fontSize: 12 }}>{inv.suggestedRole ?? "—"}</td>
+                      <td style={{ fontSize: 12, color: "var(--text-muted)" }}>{inv.eventName ?? "—"}</td>
+                      <td style={{ fontSize: 12, color: "var(--text-muted)" }}>{inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : "—"}</td>
+                      <td style={{ fontSize: 12, color: "var(--text-muted)" }}>{inv.expiresAt ? new Date(inv.expiresAt).toLocaleDateString() : "—"}</td>
+                      <td>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20, background: st.bg, border: `1px solid ${st.border}`, color: st.color }}>
+                          <Icon size={11} /> {st.label}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {inv.status === "Pending" && (
+                            <>
+                              <button className="btn btn-secondary btn-sm" style={{ display: "flex", alignItems: "center", gap: 5 }} onClick={() => copyLink(inv)}>
+                                {copied === inv.id ? <Check size={12} /> : <Copy size={12} />}
+                                {copied === inv.id ? "Copied" : "Copy"}
+                              </button>
+                              <button className="btn btn-secondary btn-sm" style={{ display: "flex", alignItems: "center", gap: 5, color: "#F87171" }} onClick={() => handleRevoke(inv.id)}>
+                                <Trash2 size={12} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {items.length === 0 && (
+                  <tr><td colSpan={7} style={{ textAlign: "center", color: "var(--text-muted)", padding: 32 }}>No invitations sent yet</td></tr>
+                )}
+              </tbody>
+            </table>
+          )}
         </CardBody>
       </GlassCard>
+
+      {!loading && totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+          <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
+          <span style={{ fontSize: 12, color: "var(--text-muted)", alignSelf: "center" }}>Page {page} of {totalPages}</span>
+          <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
+        </div>
+      )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

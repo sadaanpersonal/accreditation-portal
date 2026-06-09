@@ -1,53 +1,184 @@
 "use client";
-import { useState } from "react";
-import { Plus } from "lucide-react";
+
+import { useEffect, useState, useCallback } from "react";
+import { Plus, LayoutGrid, List, Shield, Loader, AlertCircle, RefreshCw } from "lucide-react";
 import { EventCard } from "@/components/shared/EventCard";
 import { CreateEventModal } from "@/components/shared/CreateEventModal";
-import { EVENTS, type Event } from "@/data/events";
+import { eventsApi, type EventDto } from "@/lib/api";
+import type { Event } from "@/data/events";
+
+type View = "card" | "list";
+
+/** Map API EventDto → legacy Event shape expected by EventCard. */
+function toEventShape(dto: EventDto): Event {
+  const statusMap: Record<string, "active" | "upcoming" | "completed"> = {
+    Active:    "active",
+    Draft:     "upcoming",
+    Completed: "completed",
+    Cancelled: "completed",
+  };
+
+  return {
+    id:             dto.id,
+    name:           dto.name,
+    status:         statusMap[dto.status] ?? "upcoming",
+    moiRequired:    dto.moiRequired,
+    dates:          `${new Date(dto.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} – ${new Date(dto.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`,
+    location:       [dto.venue, dto.location].filter(Boolean).join(", "),
+    accreditations: dto.accreditations ?? 0,
+    icon:           "Calendar",
+    color:          "linear-gradient(135deg,#4A0A1E,#8B1A3A)",
+    accentColor:    "#C9A84C",
+  };
+}
 
 export default function AdminEventsPage() {
-  const [events, setEvents] = useState<Event[]>(EVENTS);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [events,       setEvents]       = useState<EventDto[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState("");
+  const [modalOpen,    setModalOpen]    = useState(false);
+  const [view,         setView]         = useState<View>("card");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page,         setPage]         = useState(1);
+  const [totalPages,   setTotalPages]   = useState(1);
 
-  function handleCreate(event: Event) {
-    setEvents(prev => [event, ...prev]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    const params: Record<string, string | number> = { pageNumber: page, pageSize: 20 };
+    if (statusFilter !== "all") params.status = statusFilter;
+    const res = await eventsApi.list(params);
+    setLoading(false);
+    if (res.success && res.data) {
+      setEvents(res.data.items);
+      setTotalPages(res.data.totalPages);
+    } else {
+      setError(res.message ?? "Failed to load events.");
+    }
+  }, [page, statusFilter]);
+
+  useEffect(() => { load(); }, [load]);
+
+  function handleCreated(event: Event) {
+    // Re-fetch after create so we get server-assigned ID / counts
+    load();
+    setModalOpen(false);
   }
 
-  const activeCount   = events.filter(e => e.status === "active").length;
-  const upcomingCount = events.filter(e => e.status === "upcoming").length;
+  const filtered   = events.map(toEventShape);
+  const activeCount    = events.filter(e => e.status === "Active").length;
+  const upcomingCount  = events.filter(e => e.status === "Draft").length;
+  const completedCount = events.filter(e => e.status === "Completed" || e.status === "Cancelled").length;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Events</h1>
           <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "3px 0 0" }}>
-            {events.length} total · {activeCount} active · {upcomingCount} upcoming
+            {events.length} total · {activeCount} active · {upcomingCount} upcoming · {completedCount} completed
           </p>
         </div>
-        <button
-          className="btn btn-primary btn-sm"
-          style={{ display: "flex", alignItems: "center", gap: 6 }}
-          onClick={() => setModalOpen(true)}
-        >
-          <Plus size={14} /> Create Event
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* View toggle */}
+          <div style={{ display: "flex", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10, padding: 3, gap: 2 }}>
+            {(["card", "list"] as View[]).map(v => (
+              <button key={v} onClick={() => setView(v)} title={v === "card" ? "Card view" : "List view"}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 7, border: "none", cursor: "pointer", background: view === v ? "var(--surface-3)" : "transparent", color: view === v ? "var(--text-primary)" : "var(--text-muted)", transition: "all 0.15s" }}
+              >
+                {v === "card" ? <LayoutGrid size={15} /> : <List size={15} />}
+              </button>
+            ))}
+          </div>
+
+          <select className="form-control" style={{ margin: 0, width: "auto", fontSize: 13 }} value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
+            <option value="all">All Status</option>
+            <option value="Active">Active</option>
+            <option value="Draft">Upcoming</option>
+            <option value="Completed">Completed</option>
+          </select>
+
+          <button className="btn btn-secondary btn-sm" onClick={load} title="Refresh" style={{ padding: "6px 10px" }}>
+            <RefreshCw size={14} />
+          </button>
+
+          <button className="btn btn-primary btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={() => setModalOpen(true)}>
+            <Plus size={14} /> Create Event
+          </button>
+        </div>
       </div>
 
-      {/* Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-        {events.map(event => (
-          <EventCard key={event.id} event={event} />
+      {/* Stats chips */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {[
+          { label: "Active",       count: activeCount,                                     color: "#22C55E" },
+          { label: "Upcoming",     count: upcomingCount,                                   color: "#F59E0B" },
+          { label: "Completed",    count: completedCount,                                  color: "#6B7280" },
+          { label: "MOI Required", count: events.filter(e => e.moiRequired).length,        color: "#C9A84C", icon: <Shield size={10} /> },
+        ].map(s => (
+          <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 20, background: `${s.color}12`, border: `1px solid ${s.color}30`, fontSize: 11, fontWeight: 600, color: s.color }}>
+            {s.icon ?? <div style={{ width: 6, height: 6, borderRadius: "50%", background: s.color }} />}
+            {s.label} · {s.count}
+          </div>
         ))}
       </div>
 
-      <CreateEventModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onCreate={handleCreate}
-      />
+      {/* Loading / Error */}
+      {loading && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "48px 24px", color: "var(--text-muted)" }}>
+          <Loader size={20} style={{ animation: "spin 1s linear infinite" }} /> Loading events…
+        </div>
+      )}
+
+      {error && !loading && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 20px", background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 12, color: "#F87171" }}>
+          <AlertCircle size={16} /> {error}
+          <button className="btn btn-secondary btn-sm" onClick={load} style={{ marginLeft: "auto" }}>Retry</button>
+        </div>
+      )}
+
+      {/* Card view */}
+      {!loading && !error && view === "card" && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+          {filtered.map(event => <EventCard key={event.id} event={event} />)}
+          {filtered.length === 0 && (
+            <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "48px 24px", color: "var(--text-muted)" }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>No events found</div>
+              <div style={{ fontSize: 12 }}>Try a different status filter or create one</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* List view */}
+      {!loading && !error && view === "list" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {filtered.map(event => <EventCard key={event.id} event={event} listView />)}
+          {filtered.length === 0 && (
+            <div style={{ textAlign: "center", padding: "48px 24px", color: "var(--text-muted)", background: "var(--surface-1)", border: "1px solid var(--border)", borderRadius: 12 }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>No events found</div>
+              <div style={{ fontSize: 12 }}>Try a different filter</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+          <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
+          <span style={{ fontSize: 12, color: "var(--text-muted)", alignSelf: "center" }}>Page {page} of {totalPages}</span>
+          <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
+        </div>
+      )}
+
+      <CreateEventModal open={modalOpen} onClose={() => setModalOpen(false)} onCreate={handleCreated} />
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

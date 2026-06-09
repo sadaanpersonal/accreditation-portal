@@ -2,6 +2,7 @@
 import { LayoutDashboard, CreditCard, QrCode, Bell } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import type { NavSection } from "@/components/layout/Sidebar";
+import { useAuth } from "@/contexts/AuthContext";
 
 const NAV: NavSection[] = [
   {
@@ -14,7 +15,7 @@ const NAV: NavSection[] = [
     label: "My Pass",
     items: [
       { label: "Accreditation Pass", href: "/accredited/pass", icon: <CreditCard size={16} /> },
-      { label: "QR Code", href: "/accredited/qr", icon: <QrCode size={16} /> },
+      { label: "QR Code",            href: "/accredited/qr",   icon: <QrCode size={16} /> },
     ],
   },
   {
@@ -26,12 +27,19 @@ const NAV: NavSection[] = [
 ];
 
 export default function AccreditedLayout({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+
+  const fullName = user ? `${user.firstName} ${user.lastName}`.trim() || user.email : "Accredited";
+  const initials = user
+    ? ((user.firstName?.[0] ?? "") + (user.lastName?.[0] ?? "")).toUpperCase() || "A"
+    : "A";
+
   return (
     <AppLayout
       navSections={NAV}
-      userName="Mohammed Hassan"
-      userRole="Athlete · Qatar Athletics"
-      userInitials="MH"
+      userName={fullName}
+      userRole="Accredited · QOC Portal"
+      userInitials={initials}
       brandTitle="QOC Portal"
       brandSub="Accredited User"
       topbarTitle="My Accreditation"
