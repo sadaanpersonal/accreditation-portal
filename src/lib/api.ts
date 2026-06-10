@@ -446,6 +446,19 @@ export const usersApi = {
     request<boolean>(`${V1}/users/${id}`, { method: "DELETE" }),
 };
 
+// ── Roles ────────────────────────────────────────────────────────────────────
+export interface RoleDto {
+  id:           string;
+  name:         string;
+  code:         string;
+  description?: string;
+  userCount?:   number;
+}
+
+export const rolesApi = {
+  list: () => request<RoleDto[]>(`${V1}/roles`),
+};
+
 // ── Bulk Upload ──────────────────────────────────────────────────────────────
 export interface BulkUploadRow {
   rowNumber:     number;

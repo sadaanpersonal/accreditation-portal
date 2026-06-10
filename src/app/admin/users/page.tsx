@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Search, UserPlus, Shield, ShieldCheck, User, Loader, RefreshCw, Users as UsersIcon, BadgeCheck } from "lucide-react";
+import { Search, UserPlus, Shield, ShieldCheck, User, Loader, RefreshCw, Users as UsersIcon, BadgeCheck, Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
-import { usersApi, type UserDto } from "@/lib/api";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { EditUserModal } from "@/components/shared/EditUserModal";
+import { usersApi, rolesApi, type UserDto, type RoleDto } from "@/lib/api";
+import { useAuth, Permissions } from "@/contexts/AuthContext";
 import Link from "next/link";
 
 const ACCREDITED_ROLE = "ACCREDITED";
@@ -35,8 +39,13 @@ function roleIcon(role: string | null | undefined, color: string) {
 }
 
 export default function UsersPage() {
+  const { user: currentUser, hasPermission } = useAuth();
+  const canEdit   = hasPermission(Permissions.UsersUpdate);
+  const canDelete = hasPermission(Permissions.UsersDelete);
+
   const [tab,         setTab]         = useState<Tab>("staff");
   const [users,       setUsers]       = useState<UserDto[]>([]);
+  const [roles,       setRoles]       = useState<RoleDto[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState("");
   const [search,      setSearch]      = useState("");
@@ -44,6 +53,10 @@ export default function UsersPage() {
   const [page,        setPage]        = useState(1);
   const [totalPages,  setTotalPages]  = useState(1);
   const [totalCount,  setTotalCount]  = useState(0);
+
+  const [editUser,    setEditUser]    = useState<UserDto | null>(null);
+  const [deleteUser,  setDeleteUser]  = useState<UserDto | null>(null);
+  const [deleting,    setDeleting]    = useState(false);
 
   const isAccredited = tab === "accredited";
 
@@ -72,6 +85,25 @@ export default function UsersPage() {
   }, [page, search, roleFilter, isAccredited]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Roles for the edit modal's role dropdown (admins on this page have RolesView).
+  useEffect(() => {
+    if (!canEdit) return;
+    rolesApi.list().then(res => { if (res.success && res.data) setRoles(res.data); });
+  }, [canEdit]);
+
+  async function confirmDelete() {
+    if (!deleteUser) return;
+    setDeleting(true);
+    const res = await usersApi.delete(deleteUser.id);
+    setDeleting(false);
+    setDeleteUser(null);
+    if (res.success) {
+      toast.success("User deleted.");
+      load();
+    }
+    // Failures (e.g. requestor with accredited users) surface via the global toast.
+  }
 
   function switchTab(next: Tab) {
     if (next === tab) return;
@@ -210,7 +242,27 @@ export default function UsersPage() {
                         </span>
                       </td>
                       <td>
-                        <button className="btn btn-secondary btn-sm">Edit</button>
+                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                          {canEdit && (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => setEditUser(u)}
+                              style={{ display: "flex", alignItems: "center", gap: 5 }}
+                            >
+                              <Pencil size={13} /> Edit
+                            </button>
+                          )}
+                          {canDelete && u.id !== currentUser?.id && (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              title="Delete user"
+                              onClick={() => setDeleteUser(u)}
+                              style={{ display: "flex", alignItems: "center", color: "#F87171", padding: "0 9px" }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -233,6 +285,25 @@ export default function UsersPage() {
           <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
         </div>
       )}
+
+      <EditUserModal
+        open={!!editUser}
+        user={editUser}
+        roles={roles}
+        onClose={() => setEditUser(null)}
+        onSaved={() => { setEditUser(null); toast.success("User updated."); load(); }}
+      />
+
+      <ConfirmDialog
+        open={!!deleteUser}
+        danger
+        title="Delete user?"
+        message={<><strong>{deleteUser?.fullName}</strong> will be removed and will lose access to the portal.</>}
+        confirmLabel="Delete"
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onClose={() => setDeleteUser(null)}
+      />
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
