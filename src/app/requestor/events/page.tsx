@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { Search, Loader, RefreshCw } from "lucide-react";
+import { Search, Loader, RefreshCw, LayoutGrid, List } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { EventCard, type EventCardData } from "@/components/shared/EventCard";
 import { eventsApi, type EventDto } from "@/lib/api";
 
@@ -18,8 +19,8 @@ const CARD_ACCENTS = [
 
 function normalizeStatus(s: string): "active" | "upcoming" | "completed" {
   const l = (s ?? "").toLowerCase();
-  if (l === "active")    return "active";
-  if (l === "upcoming")  return "upcoming";
+  if (l === "active")   return "active";
+  if (l === "upcoming") return "upcoming";
   return "completed";
 }
 
@@ -38,26 +39,31 @@ function formatDateRange(start: string, end: string): string {
 function toCardEvent(e: EventDto, idx: number): EventCardData {
   const ci = idx % CARD_COLORS.length;
   return {
-    id:            e.id,
-    name:          e.name,
-    dates:         formatDateRange(e.startDate, e.endDate),
-    location:      e.venue || e.location || "Qatar",
-    status:        normalizeStatus(e.status),
+    id:             e.id,
+    name:           e.name,
+    dates:          formatDateRange(e.startDate, e.endDate),
+    location:       e.venue || e.location || "Qatar",
+    status:         normalizeStatus(e.status),
     accreditations: e.accreditations ?? 0,
-    moiRequired:   e.moiRequired,
-    color:         CARD_COLORS[ci],
-    accentColor:   CARD_ACCENTS[ci],
+    moiRequired:    e.moiRequired,
+    color:          CARD_COLORS[ci],
+    accentColor:    CARD_ACCENTS[ci],
   };
 }
 
+type ViewMode = "card" | "list";
+
 export default function RequestorEventsPage() {
-  const [events,  setEvents]  = useState<EventDto[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState("");
-  const [search,  setSearch]  = useState("");
-  const [filter,  setFilter]  = useState("all");
-  const [page,    setPage]    = useState(1);
+  const router = useRouter();
+
+  const [events,     setEvents]     = useState<EventDto[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState("");
+  const [search,     setSearch]     = useState("");
+  const [filter,     setFilter]     = useState("all");
+  const [page,       setPage]       = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [viewMode,   setViewMode]   = useState<ViewMode>("card");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,15 +90,57 @@ export default function RequestorEventsPage() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
+  function handleApply(eventId: string) {
+    router.push(`/requestor/requests/new?eventId=${eventId}`);
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700 }}>Events</h1>
-        <button className="btn btn-secondary btn-sm" onClick={load} disabled={loading} title="Refresh">
-          <RefreshCw size={13} style={loading ? { animation: "spin 1s linear infinite" } : undefined} />
-        </button>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Events</h1>
+          {!loading && (
+            <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "3px 0 0" }}>
+              {events.length} event{events.length !== 1 ? "s" : ""} shown
+            </p>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {/* View toggle */}
+          <div style={{ display: "flex", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+            <button
+              onClick={() => setViewMode("card")}
+              title="Card view"
+              style={{
+                padding: "6px 10px", border: "none", cursor: "pointer", display: "flex", alignItems: "center",
+                background: viewMode === "card" ? "var(--maroon)" : "transparent",
+                color:      viewMode === "card" ? "#fff" : "var(--text-muted)",
+                transition: "background .15s, color .15s",
+              }}
+            >
+              <LayoutGrid size={15} />
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              title="List view"
+              style={{
+                padding: "6px 10px", border: "none", cursor: "pointer", display: "flex", alignItems: "center",
+                background: viewMode === "list" ? "var(--maroon)" : "transparent",
+                color:      viewMode === "list" ? "#fff" : "var(--text-muted)",
+                transition: "background .15s, color .15s",
+              }}
+            >
+              <List size={15} />
+            </button>
+          </div>
+          <button className="btn btn-secondary btn-sm" onClick={load} disabled={loading} title="Refresh">
+            <RefreshCw size={13} style={loading ? { animation: "spin 1s linear infinite" } : undefined} />
+          </button>
+        </div>
       </div>
 
+      {/* Filters */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: "1 1 240px" }}>
           <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
@@ -117,6 +165,7 @@ export default function RequestorEventsPage() {
         </select>
       </div>
 
+      {/* Content */}
       {loading ? (
         <div style={{ display: "flex", justifyContent: "center", padding: "60px 24px", color: "var(--text-muted)", gap: 10 }}>
           <Loader size={18} style={{ animation: "spin 1s linear infinite" }} /> Loading events…
@@ -126,32 +175,42 @@ export default function RequestorEventsPage() {
           {error}
           <button className="btn btn-secondary btn-sm" onClick={load} style={{ display: "block", margin: "12px auto 0" }}>Retry</button>
         </div>
+      ) : events.length === 0 ? (
+        <div style={{ textAlign: "center", color: "var(--text-muted)", padding: 48 }}>No events found</div>
+      ) : viewMode === "card" ? (
+        /* ── Card grid ── */
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+          {events.map((e, i) => (
+            <EventCard
+              key={e.id}
+              event={toCardEvent(e, i)}
+              onApply={normalizeStatus(e.status) !== "completed" ? () => handleApply(e.id) : undefined}
+              applied={false}
+            />
+          ))}
+        </div>
       ) : (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-            {events.map((e, i) => (
-              <EventCard
-                key={e.id}
-                event={toCardEvent(e, i)}
-                onApply={e.status.toLowerCase() !== "completed" ? () => {} : undefined}
-                applied={false}
-              />
-            ))}
-            {events.length === 0 && (
-              <div style={{ gridColumn: "1 / -1", textAlign: "center", color: "var(--text-muted)", padding: 40 }}>
-                No events found
-              </div>
-            )}
-          </div>
+        /* ── List view ── */
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {events.map((e, i) => (
+            <EventCard
+              key={e.id}
+              event={toCardEvent(e, i)}
+              listView
+              onApply={normalizeStatus(e.status) !== "completed" ? () => handleApply(e.id) : undefined}
+              applied={false}
+            />
+          ))}
+        </div>
+      )}
 
-          {totalPages > 1 && (
-            <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 8 }}>
-              <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
-              <span style={{ fontSize: 12, color: "var(--text-muted)", alignSelf: "center" }}>Page {page} of {totalPages}</span>
-              <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
-            </div>
-          )}
-        </>
+      {/* Pagination */}
+      {!loading && totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 8 }}>
+          <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
+          <span style={{ fontSize: 12, color: "var(--text-muted)", alignSelf: "center" }}>Page {page} of {totalPages}</span>
+          <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
+        </div>
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

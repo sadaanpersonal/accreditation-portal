@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, CheckCircle, Loader, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
@@ -12,7 +12,10 @@ const ROLES = ["Athlete", "Media", "VIP", "Staff", "Official", "Coach"];
 const NATIONALITIES = ["Qatar", "Saudi Arabia", "UAE", "Bahrain", "Kuwait", "Oman", "Jordan", "Egypt", "Tunisia", "Morocco", "Other"];
 
 export default function NewRequestPage() {
-  const router = useRouter();
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+  const presetEventId = searchParams.get("eventId") ?? "";
+
   const [events,    setEvents]    = useState<EventDto[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -21,7 +24,7 @@ export default function NewRequestPage() {
 
   const [form, setForm] = useState({
     firstName: "", lastName: "", nationality: "", passportNumber: "", dateOfBirth: "",
-    role: "", eventId: "", venueId: "", zones: [] as string[],
+    role: "", eventId: presetEventId, venueId: "", zones: [] as string[],
     phone: "", email: "", organization: "", position: "", notes: "",
   });
 
@@ -30,6 +33,14 @@ export default function NewRequestPage() {
       if (res.success && res.data) setEvents(res.data.items);
     });
   }, []);
+
+  // Sync preset eventId once events load (covers the case where events load after mount)
+  useEffect(() => {
+    if (presetEventId && form.eventId !== presetEventId) {
+      setForm(prev => ({ ...prev, eventId: presetEventId }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetEventId]);
 
   function set(key: keyof typeof form, value: unknown) {
     setForm(prev => ({ ...prev, [key]: value }));
