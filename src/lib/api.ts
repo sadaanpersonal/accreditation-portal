@@ -461,3 +461,26 @@ export const notificationsApi = {
   markRead: (id: string) =>
     request<boolean>(`${V1}/notifications/${id}/mark-read`, { method: "PUT" }),
 };
+
+// ── Pass Access (email link landing) ────────────────────────────────────────
+export interface PassAccessCheckDto {
+  email:           string;
+  holderName:      string;
+  eventName:       string;
+  accreditationId: string;
+  hasAccount:      boolean;
+}
+
+export const passAccessApi = {
+  /** Validate the one-time token from the approval email. */
+  check: (token: string) =>
+    request<PassAccessCheckDto>(`${V1}/pass-access/check?token=${encodeURIComponent(token)}`),
+
+  /** First-time registration using the email locked to the approved request. */
+  activate: (token: string, firstName: string, lastName: string, password: string) =>
+    request<boolean>(`${V1}/pass-access/activate`, {
+      method: "POST",
+      body:   JSON.stringify({ token, firstName, lastName, password }),
+    }),
+};
+
