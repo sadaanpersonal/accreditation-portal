@@ -1,13 +1,14 @@
 "use client";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ChevronLeft, MessageSquare, Loader } from "lucide-react";
+import { ChevronLeft, MessageSquare, Loader, Copy, Eye } from "lucide-react";
 import Link from "next/link";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
 import { RoleTag } from "@/components/ui/RoleTag";
 import { ApprovalPipeline, type PipelineState } from "@/components/shared/ApprovalPipeline";
-import { requestsApi, pipelineApi, type RequestDto } from "@/lib/api";
+import { DocumentViewerModal } from "@/components/shared/DocumentViewerModal";
+import { requestsApi, pipelineApi, resolveFileUrl, type RequestDto } from "@/lib/api";
 
 function toPipelineState(req: RequestDto): PipelineState {
   return {
@@ -31,8 +32,22 @@ function fmtDate(iso?: string | null) {
   catch { return iso; }
 }
 
+const CLONE_KEY = "qoc_clone_request";
+
+/** Convert an ISO datetime string to yyyy-MM-dd for the date picker. */
+function toDateInput(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export default function RequestDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [req, setReq] = useState<RequestDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +56,7 @@ export default function RequestDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [viewDoc, setViewDoc] = useState<{ url: string; fileName: string } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -60,6 +76,26 @@ export default function RequestDetailPage() {
   }
 
   useEffect(() => { load(); }, [id]);
+
+  function handleCloneRequest() {
+    if (!req) return;
+    const clone = {
+      firstName:      req.firstName,
+      lastName:       req.lastName,
+      nationality:    req.nationality,
+      passportNumber: req.passportNumber,
+      dateOfBirth:    toDateInput(req.dateOfBirth),
+      role:           req.role,
+      email:          req.email,
+      phone:          req.phone,
+      organization:   req.organization,
+      position:       req.position,
+      sourceEventId:   req.eventId,
+      sourceEventName: req.eventName,
+    };
+    sessionStorage.setItem(CLONE_KEY, JSON.stringify(clone));
+    router.push("/requestor/requests/new?clone=1");
+  }
 
   async function handleSubmitResponse() {
     if (!responseNote.trim() || !req) return;
@@ -110,6 +146,14 @@ export default function RequestDetailPage() {
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{req.fullName}</h1>
           <span style={{ fontSize: 11, color: "var(--text-muted)" }}>#{req.accreditationId}</span>
         </div>
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={handleCloneRequest}
+          style={{ display: "flex", alignItems: "center", gap: 6 }}
+          title="Create a new request for this person at a different event"
+        >
+          <Copy size={14} /> New Request
+        </button>
         <Badge variant={pipelineVariant(req)} />
       </div>
 
@@ -184,11 +228,23 @@ export default function RequestDetailPage() {
               <CardHeader><h2 style={{ fontSize: 14, fontWeight: 600 }}>Documents</h2></CardHeader>
               <CardBody style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {req.documents.map(doc => (
-                  <div key={doc.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", background: "var(--surface-3)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
-                    <span style={{ fontSize: 12, fontWeight: 500 }}>{doc.fileName}</span>
-                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                      {doc.type} · {(doc.fileSizeBytes / 1024).toFixed(0)} KB
-                    </span>
+                  <div key={doc.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 10px", background: "var(--surface-3)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+                    <span style={{ fontSize: 12, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{doc.fileName}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+                      <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                        {doc.type} · {(doc.fileSizeBytes / 1024).toFixed(0)} KB
+                      </span>
+                      {doc.blobUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setViewDoc({ url: resolveFileUrl(doc.blobUrl), fileName: doc.fileName })}
+                          title="View document"
+                          style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: "var(--gold)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                        >
+                          <Eye size={14} /> View
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </CardBody>
@@ -258,6 +314,14 @@ export default function RequestDetailPage() {
           </GlassCard>
         </div>
       </div>
+
+      {/* Document Viewer */}
+      <DocumentViewerModal
+        open={!!viewDoc}
+        onClose={() => setViewDoc(null)}
+        src={viewDoc?.url ?? ""}
+        fileName={viewDoc?.fileName}
+      />
     </div>
   );
 }

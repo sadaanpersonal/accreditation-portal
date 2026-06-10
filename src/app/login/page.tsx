@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, LogIn, AlertCircle, Loader, HelpCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { HowItWorksModal } from "@/components/shared/HowItWorksModal";
 
-export default function LoginPage() {
+function LoginForm() {
   const { login } = useAuth();
+  const searchParams = useSearchParams();
 
-  const [email,     setEmail]     = useState("");
+  const [email,     setEmail]     = useState(() => searchParams.get("email") ?? "");
   const [password,  setPassword]  = useState("");
   const [showPw,    setShowPw]    = useState(false);
   const [loading,   setLoading]   = useState(false);
@@ -134,5 +136,18 @@ export default function LoginPage() {
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Loader size={24} style={{ animation: "spin 1s linear infinite", color: "var(--text-muted)" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

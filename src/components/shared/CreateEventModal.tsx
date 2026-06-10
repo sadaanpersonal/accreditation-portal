@@ -1,26 +1,88 @@
 "use client";
-import { useState, type ReactNode } from "react";
-import { X, Check, Calendar, MapPin, Shield, Palette, Tag, Loader } from "lucide-react";
+import { useState, useEffect, type ReactNode } from "react";
+import { X, Check, Calendar, MapPin, Shield, Palette, Tag, Loader, Pipette } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { eventsApi } from "@/lib/api";
+import { eventsApi, type EventDto } from "@/lib/api";
+import { DatePicker } from "@/components/ui/DatePicker";
+
+/** Today at 00:00 local — start dates may not be before this. */
+function startOfToday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/** Parse a yyyy-MM-dd string to a local Date (no tz drift), or null. */
+function parseDate(value?: string): Date | null {
+  if (!value) return null;
+  const [y, m, d] = value.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
 
 interface Props {
   open: boolean;
   onClose: () => void;
   onCreate: () => void;
+  /** When provided, the modal is in edit mode and updates this event. */
+  event?: EventDto | null;
 }
 
+// `value` is the canonical hex stored on the event (self-describing for future
+// card theming); `color`/`accent` drive the swatch + preview banner.
 const THEMES = [
-  { label: "Maroon",  color: "linear-gradient(135deg,#4A0A1E,#8B1A3A)", accent: "#C9A84C" },
-  { label: "Blue",    color: "linear-gradient(135deg,#0D2B5C,#2060B0)", accent: "#60A5FA" },
-  { label: "Purple",  color: "linear-gradient(135deg,#3B1E6B,#6D3ABF)", accent: "#A78BFA" },
-  { label: "Pink",    color: "linear-gradient(135deg,#4A0A2E,#9B1A68)", accent: "#F472B6" },
-  { label: "Teal",    color: "linear-gradient(135deg,#0F3A38,#1A6B68)", accent: "#2DD4BF" },
-  { label: "Slate",   color: "linear-gradient(135deg,#1F2937,#374151)", accent: "#9CA3AF" },
+  { label: "Maroon",  color: "linear-gradient(135deg,#4A0A1E,#8B1A3A)", accent: "#C9A84C", value: "#8B1A3A" },
+  { label: "Blue",    color: "linear-gradient(135deg,#0D2B5C,#2060B0)", accent: "#60A5FA", value: "#2060B0" },
+  { label: "Purple",  color: "linear-gradient(135deg,#3B1E6B,#6D3ABF)", accent: "#A78BFA", value: "#6D3ABF" },
+  { label: "Pink",    color: "linear-gradient(135deg,#4A0A2E,#9B1A68)", accent: "#F472B6", value: "#9B1A68" },
+  { label: "Teal",    color: "linear-gradient(135deg,#0F3A38,#1A6B68)", accent: "#2DD4BF", value: "#1A6B68" },
+  { label: "Emerald", color: "linear-gradient(135deg,#064E3B,#059669)", accent: "#34D399", value: "#059669" },
+  { label: "Cyan",    color: "linear-gradient(135deg,#083344,#0891B2)", accent: "#22D3EE", value: "#0891B2" },
+  { label: "Indigo",  color: "linear-gradient(135deg,#1E1B4B,#4F46E5)", accent: "#818CF8", value: "#4F46E5" },
+  { label: "Amber",   color: "linear-gradient(135deg,#78350F,#D97706)", accent: "#FBBF24", value: "#D97706" },
+  { label: "Orange",  color: "linear-gradient(135deg,#7C2D12,#EA580C)", accent: "#FB923C", value: "#EA580C" },
+  { label: "Crimson", color: "linear-gradient(135deg,#4C0519,#BE123C)", accent: "#FB7185", value: "#BE123C" },
+  { label: "Slate",   color: "linear-gradient(135deg,#1F2937,#374151)", accent: "#9CA3AF", value: "#374151" },
 ];
 
-function slugify(str: string) {
-  return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+/** Darken a #RRGGBB hex toward black by `amount` (0–1). */
+function darken(hex: string, amount = 0.5): string {
+  const n = parseInt(hex.replace("#", ""), 16);
+  if (Number.isNaN(n)) return hex;
+  const r = Math.round(((n >> 16) & 255) * (1 - amount));
+  const g = Math.round(((n >> 8) & 255) * (1 - amount));
+  const b = Math.round((n & 255) * (1 - amount));
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
+
+/** Build a preview gradient from a single picked colour. */
+function gradientFromHex(hex: string): string {
+  return `linear-gradient(135deg, ${darken(hex, 0.55)}, ${hex})`;
+}
+
+/** ISO date/datetime → yyyy-MM-dd for the date picker. */
+function toDateInput(iso?: string): string {
+  if (!iso) return "";
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(iso);
+  if (m) return m[1];
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Resolve a stored theme (preset hex, preset label, or custom hex) back to picker state. */
+function resolveTheme(theme?: string): { themeIdx: number; useCustom: boolean; customColor: string } {
+  const fallback = { themeIdx: 0, useCustom: false, customColor: "#C9A84C" };
+  if (!theme) return fallback;
+  const t = theme.trim();
+  const byValue = THEMES.findIndex(x => x.value.toLowerCase() === t.toLowerCase());
+  if (byValue >= 0) return { themeIdx: byValue, useCustom: false, customColor: THEMES[byValue].value };
+  const byLabel = THEMES.findIndex(x => x.label.toLowerCase() === t.toLowerCase());
+  if (byLabel >= 0) return { themeIdx: byLabel, useCustom: false, customColor: THEMES[byLabel].value };
+  if (/^#?[0-9a-fA-F]{6}$/.test(t)) {
+    return { themeIdx: 0, useCustom: true, customColor: (t.startsWith("#") ? t : `#${t}`).toUpperCase() };
+  }
+  return fallback;
 }
 
 const EMPTY = {
@@ -34,6 +96,8 @@ const EMPTY = {
   status: "Draft" as string,
   moiRequired: false,
   themeIdx: 0,
+  useCustom: false,
+  customColor: "#C9A84C",
 };
 
 // Field is defined at module scope so React always sees the same component
@@ -52,29 +116,75 @@ function Field({ label, error, children }: { label: string; error?: string; chil
   );
 }
 
-export function CreateEventModal({ open, onClose, onCreate }: Props) {
+export function CreateEventModal({ open, onClose, onCreate, event }: Props) {
+  const isEdit = !!event;
   const [form, setForm]     = useState(EMPTY);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [apiErr, setApiErr] = useState("");
 
+  // Initialise the form whenever the modal opens (prefill in edit mode, blank for create).
+  useEffect(() => {
+    if (!open) return;
+    if (event) {
+      const th = resolveTheme(event.theme);
+      setForm({
+        name:        event.name ?? "",
+        startDate:   toDateInput(event.startDate),
+        endDate:     toDateInput(event.endDate),
+        venue:       event.venue ?? "",
+        location:    event.location ?? "",
+        eventCode:   event.eventCode ?? "",
+        description: event.description ?? "",
+        status:      event.status ?? "Draft",
+        moiRequired: event.moiRequired ?? false,
+        themeIdx:    th.themeIdx,
+        useCustom:   th.useCustom,
+        customColor: th.customColor,
+      });
+    } else {
+      setForm(EMPTY);
+    }
+    setErrors({});
+    setApiErr("");
+  }, [open, event]);
+
   function validate() {
     const e: Record<string, string> = {};
     if (!form.name.trim())      e.name      = "Event name is required";
-    if (!form.startDate.trim()) e.startDate = "Start date is required";
-    if (!form.endDate.trim())   e.endDate   = "End date is required";
     if (!form.venue.trim())     e.venue     = "Venue is required";
     if (!form.eventCode.trim()) e.eventCode = "Event code (e.g. GAC) is required";
+
+    const start = parseDate(form.startDate);
+    const end   = parseDate(form.endDate);
+
+    if (!start) {
+      e.startDate = "Start date is required";
+    } else if (!isEdit && start < startOfToday()) {
+      // Existing events may legitimately have a start date in the past.
+      e.startDate = "Start date cannot be in the past";
+    }
+
+    if (!end) {
+      e.endDate = "End date is required";
+    } else if (start && end < start) {
+      e.endDate = "End date cannot be before the start date";
+    }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   }
+
+  // Resolved theme presentation + the hex value persisted on the event.
+  const previewGradient = form.useCustom ? gradientFromHex(form.customColor) : THEMES[form.themeIdx].color;
+  const themeValue      = form.useCustom ? form.customColor.toUpperCase() : THEMES[form.themeIdx].value;
+  const themeLabel      = form.useCustom ? form.customColor.toUpperCase() : THEMES[form.themeIdx].label;
 
   async function handleSubmit() {
     if (!validate()) return;
     setSaving(true);
     setApiErr("");
-    const theme = THEMES[form.themeIdx];
-    const res = await eventsApi.create({
+    const body = {
       name:        form.name.trim(),
       description: form.description.trim() || undefined,
       startDate:   form.startDate,
@@ -84,11 +194,14 @@ export function CreateEventModal({ open, onClose, onCreate }: Props) {
       eventCode:   form.eventCode.trim().toUpperCase(),
       status:      form.status,
       moiRequired: form.moiRequired,
-      theme:       theme.label,
-    });
+      theme:       themeValue,
+    };
+    const res = event
+      ? await eventsApi.update(event.id, body)
+      : await eventsApi.create(body);
     setSaving(false);
     if (!res.success || !res.data) {
-      setApiErr(res.message ?? res.errors?.[0] ?? "Failed to create event.");
+      setApiErr(res.message ?? res.errors?.[0] ?? `Failed to ${isEdit ? "update" : "create"} event.`);
       return;
     }
     onCreate();
@@ -143,8 +256,8 @@ export function CreateEventModal({ open, onClose, onCreate }: Props) {
               background: "var(--surface-2)",
             }}>
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>Create Event</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Add a new accreditation event</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>{isEdit ? "Edit Event" : "Create Event"}</div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{isEdit ? "Update event details" : "Add a new accreditation event"}</div>
               </div>
               <button
                 onClick={handleClose}
@@ -155,7 +268,7 @@ export function CreateEventModal({ open, onClose, onCreate }: Props) {
             </div>
 
             {/* Preview banner */}
-            <div style={{ height: 6, background: THEMES[form.themeIdx].color, transition: "background 0.3s" }} />
+            <div style={{ height: 6, background: previewGradient, transition: "background 0.3s" }} />
 
             {/* Body */}
             <div style={{ padding: "22px", display: "flex", flexDirection: "column", gap: 18, maxHeight: "calc(100vh - 200px)", overflowY: "auto" }}>
@@ -181,10 +294,29 @@ export function CreateEventModal({ open, onClose, onCreate }: Props) {
                   <input className="form-control" placeholder="e.g. GAC" maxLength={10} value={form.eventCode} onChange={e => setForm(f => ({ ...f, eventCode: e.target.value.toUpperCase() }))} />
                 </Field>
                 <Field label="Start Date" error={errors.startDate}>
-                  <input className="form-control" type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} />
+                  <DatePicker
+                    value={form.startDate}
+                    onChange={v => setForm(f => ({
+                      ...f,
+                      startDate: v,
+                      // Keep the range valid: clear an end date that now precedes the new start.
+                      endDate: f.endDate && v && parseDate(f.endDate)! < parseDate(v)! ? "" : f.endDate,
+                    }))}
+                    placeholder="Start date"
+                    minDate={isEdit ? undefined : startOfToday()}
+                    error={!!errors.startDate}
+                    portal
+                  />
                 </Field>
                 <Field label="End Date" error={errors.endDate}>
-                  <input className="form-control" type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} />
+                  <DatePicker
+                    value={form.endDate}
+                    onChange={v => setForm(f => ({ ...f, endDate: v }))}
+                    placeholder="End date"
+                    minDate={parseDate(form.startDate) ?? startOfToday()}
+                    error={!!errors.endDate}
+                    portal
+                  />
                 </Field>
               </div>
 
@@ -252,31 +384,58 @@ export function CreateEventModal({ open, onClose, onCreate }: Props) {
 
               {/* Theme */}
               <Field label="Theme Colour">
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {THEMES.map((t, i) => (
-                    <button
-                      key={t.label}
-                      title={t.label}
-                      onClick={() => setForm(f => ({ ...f, themeIdx: i }))}
-                      style={{
-                        width: 34, height: 34, borderRadius: 8, cursor: "pointer",
-                        background: t.color,
-                        border: form.themeIdx === i
-                          ? `3px solid ${t.accent}`
-                          : "3px solid transparent",
-                        boxShadow: form.themeIdx === i ? `0 0 0 1px ${t.accent}80` : "none",
-                        transition: "all 0.15s",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}
-                    >
-                      {form.themeIdx === i && (
-                        <Check size={13} color={t.accent} strokeWidth={3} />
-                      )}
-                    </button>
-                  ))}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  {THEMES.map((t, i) => {
+                    const selected = !form.useCustom && form.themeIdx === i;
+                    return (
+                      <button
+                        key={t.label}
+                        type="button"
+                        title={t.label}
+                        onClick={() => setForm(f => ({ ...f, themeIdx: i, useCustom: false }))}
+                        style={{
+                          width: 34, height: 34, borderRadius: 8, cursor: "pointer",
+                          background: t.color,
+                          border: selected ? `3px solid ${t.accent}` : "3px solid transparent",
+                          boxShadow: selected ? `0 0 0 1px ${t.accent}80` : "none",
+                          transition: "all 0.15s",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}
+                      >
+                        {selected && <Check size={13} color={t.accent} strokeWidth={3} />}
+                      </button>
+                    );
+                  })}
+
+                  {/* Custom colour picker (eyedropper) */}
+                  <label
+                    title="Pick a custom colour"
+                    style={{
+                      position: "relative",
+                      width: 34, height: 34, borderRadius: 8, cursor: "pointer",
+                      background: form.useCustom ? gradientFromHex(form.customColor) : "var(--surface-3)",
+                      border: form.useCustom ? `3px solid ${form.customColor}` : "3px dashed var(--border-strong)",
+                      boxShadow: form.useCustom ? `0 0 0 1px ${form.customColor}80` : "none",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    <input
+                      type="color"
+                      value={form.customColor}
+                      onChange={e => setForm(f => ({ ...f, customColor: e.target.value, useCustom: true }))}
+                      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", border: "none", padding: 0 }}
+                    />
+                    {form.useCustom
+                      ? <Check size={13} color="#fff" strokeWidth={3} style={{ pointerEvents: "none" }} />
+                      : <Pipette size={14} style={{ color: "var(--text-muted)", pointerEvents: "none" }} />}
+                  </label>
+
                   <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 6 }}>
                     <Palette size={13} style={{ color: "var(--text-muted)" }} />
-                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{THEMES[form.themeIdx].label}</span>
+                    <span style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: form.useCustom ? "var(--font-mono), monospace" : undefined }}>
+                      {themeLabel}
+                    </span>
                   </div>
                 </div>
               </Field>
@@ -298,7 +457,7 @@ export function CreateEventModal({ open, onClose, onCreate }: Props) {
               >
                 {saving
                   ? <><Loader size={13} style={{ animation: "spin 1s linear infinite" }} /> Saving…</>
-                  : <><Check size={13} /> Create Event</>
+                  : <><Check size={13} /> {isEdit ? "Save Changes" : "Create Event"}</>
                 }
               </button>
               <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

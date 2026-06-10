@@ -13,7 +13,7 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+    <div style={{ maxWidth: 940, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
       <h1 style={{ fontSize: 20, fontWeight: 700 }}>Settings</h1>
 
       <GlassCard>

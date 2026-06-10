@@ -10,6 +10,8 @@ export interface NavItem {
   href: string;
   icon: React.ReactNode;
   badge?: string | number;
+  /** Permission code required to see this item. Omit to always show. */
+  permission?: string;
 }
 
 export interface NavSection {

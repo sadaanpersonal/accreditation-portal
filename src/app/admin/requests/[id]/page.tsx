@@ -1,14 +1,15 @@
 "use client";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ChevronLeft, Loader, FileText } from "lucide-react";
+import { ChevronLeft, Loader, FileText, Copy, Eye } from "lucide-react";
 import Link from "next/link";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
 import { RoleTag } from "@/components/ui/RoleTag";
 import { ApprovalPipeline, type PipelineState } from "@/components/shared/ApprovalPipeline";
 import { Modal } from "@/components/ui/Modal";
-import { requestsApi, pipelineApi, type RequestDto } from "@/lib/api";
+import { DocumentViewerModal } from "@/components/shared/DocumentViewerModal";
+import { requestsApi, pipelineApi, resolveFileUrl, type RequestDto } from "@/lib/api";
 
 function toPipelineState(req: RequestDto): PipelineState {
   return {
@@ -36,8 +37,22 @@ const STAGE_NAMES: Record<number, string> = {
   1: "FA Owner", 2: "Zone Owner", 3: "Media Owner", 4: "MOI Clearance",
 };
 
+const CLONE_KEY = "qoc_clone_request";
+
+/** Convert an ISO datetime string to yyyy-MM-dd for the date picker. */
+function toDateInput(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export default function AdminRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [req, setReq] = useState<RequestDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +65,7 @@ export default function AdminRequestDetailPage() {
   const [venueInput, setVenueInput] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [viewDoc, setViewDoc] = useState<{ url: string; fileName: string } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -72,8 +88,28 @@ export default function AdminRequestDetailPage() {
 
   useEffect(() => { load(); }, [id]);
 
-  async function doReview(decision: string, notes?: string, extra?: { zoneAccess?: string; assignedVenue?: string }) {
+  function handleCloneRequest() {
     if (!req) return;
+    const clone = {
+      firstName:      req.firstName,
+      lastName:       req.lastName,
+      nationality:    req.nationality,
+      passportNumber: req.passportNumber,
+      dateOfBirth:    toDateInput(req.dateOfBirth),
+      role:           req.role,
+      email:          req.email,
+      phone:          req.phone,
+      organization:   req.organization,
+      position:       req.position,
+      sourceEventId:   req.eventId,
+      sourceEventName: req.eventName,
+    };
+    sessionStorage.setItem(CLONE_KEY, JSON.stringify(clone));
+    router.push("/admin/requests/new?clone=1");
+  }
+
+  async function doReview(decision: string, notes?: string, extra?: { zoneAccess?: string; assignedVenue?: string }) {
+    if (!req || actionLoading) return;   // guard: prevent double-submission
     setActionLoading(true);
     setActionError(null);
     try {
@@ -152,6 +188,14 @@ export default function AdminRequestDetailPage() {
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{req.fullName}</h1>
           <span style={{ fontSize: 11, color: "var(--text-muted)" }}>#{req.accreditationId} · {req.eventName}</span>
         </div>
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={handleCloneRequest}
+          style={{ display: "flex", alignItems: "center", gap: 6 }}
+          title="Create a new request for this person at a different event"
+        >
+          <Copy size={14} /> New Request
+        </button>
         <Badge variant={pipelineVariant(req)} />
       </div>
 
@@ -216,14 +260,26 @@ export default function AdminRequestDetailPage() {
               <CardHeader><h2 style={{ fontSize: 14, fontWeight: 600 }}>Documents</h2></CardHeader>
               <CardBody style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {req.documents.map(doc => (
-                  <div key={doc.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", background: "var(--surface-3)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <FileText size={14} color="var(--text-muted)" />
-                      <span style={{ fontSize: 12, fontWeight: 500 }}>{doc.fileName}</span>
+                  <div key={doc.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 10px", background: "var(--surface-3)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                      <FileText size={14} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.fileName}</span>
                     </div>
-                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                      {doc.type} · {(doc.fileSizeBytes / 1024).toFixed(0)} KB
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+                      <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                        {doc.type} · {(doc.fileSizeBytes / 1024).toFixed(0)} KB
+                      </span>
+                      {doc.blobUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setViewDoc({ url: resolveFileUrl(doc.blobUrl), fileName: doc.fileName })}
+                          title="View document"
+                          style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: "var(--gold)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                        >
+                          <Eye size={14} /> View
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </CardBody>
@@ -276,9 +332,10 @@ export default function AdminRequestDetailPage() {
           <CardBody>
             <ApprovalPipeline
               state={toPipelineState(req)}
-              onApprove={!isTerminated && !req.isInfoRequested ? handleApprove : undefined}
-              onReject={!isTerminated ? () => setRejectModal(true) : undefined}
-              onRequestInfo={!isTerminated && !req.isInfoRequested ? () => setInfoModal(true) : undefined}
+              onApprove={!isTerminated && !req.isInfoRequested && !actionLoading ? handleApprove : undefined}
+              onReject={!isTerminated && !actionLoading ? () => setRejectModal(true) : undefined}
+              onRequestInfo={!isTerminated && !req.isInfoRequested && !actionLoading ? () => setInfoModal(true) : undefined}
+              processing={actionLoading}
               zoneContent={zoneContent}
             />
             {actionLoading && (
@@ -336,6 +393,14 @@ export default function AdminRequestDetailPage() {
         </div>
         {actionError && <p style={{ color: "#EF4444", fontSize: 12, marginTop: 8 }}>{actionError}</p>}
       </Modal>
+
+      {/* Document Viewer */}
+      <DocumentViewerModal
+        open={!!viewDoc}
+        onClose={() => setViewDoc(null)}
+        src={viewDoc?.url ?? ""}
+        fileName={viewDoc?.fileName}
+      />
     </div>
   );
 }

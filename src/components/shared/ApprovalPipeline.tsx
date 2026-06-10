@@ -21,10 +21,11 @@ interface Props {
   onReject?: () => void;
   onRequestInfo?: () => void;
   readOnly?: boolean;
+  processing?: boolean;
   zoneContent?: React.ReactNode;
 }
 
-export function ApprovalPipeline({ state, onApprove, onReject, onRequestInfo, readOnly, zoneContent }: Props) {
+export function ApprovalPipeline({ state, onApprove, onReject, onRequestInfo, readOnly, processing, zoneContent }: Props) {
   const { currentStage, rejected, infoRequested } = state;
 
   return (
@@ -70,17 +71,17 @@ export function ApprovalPipeline({ state, onApprove, onReject, onRequestInfo, re
                 {showActions && (
                   <div className="approval-stage-actions">
                     {onApprove && (
-                      <button className="btn btn-success btn-sm" onClick={onApprove}>
-                        <Check size={14} /> Approve
+                      <button className="btn btn-success btn-sm" onClick={onApprove} disabled={processing}>
+                        <Check size={14} /> {processing ? "Processing…" : "Approve"}
                       </button>
                     )}
                     {onRequestInfo && !stage.isMoi && (
-                      <button className="btn btn-warning btn-sm" onClick={onRequestInfo}>
+                      <button className="btn btn-warning btn-sm" onClick={onRequestInfo} disabled={processing}>
                         <HelpCircle size={14} /> Request Info
                       </button>
                     )}
                     {onReject && (
-                      <button className="btn btn-danger btn-sm" onClick={onReject}>
+                      <button className="btn btn-danger btn-sm" onClick={onReject} disabled={processing}>
                         <X size={14} /> Reject
                       </button>
                     )}

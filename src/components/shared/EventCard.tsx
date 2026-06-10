@@ -1,5 +1,7 @@
 "use client";
-import { Calendar, MapPin, Users, ChevronRight, Shield, MoreHorizontal } from "lucide-react";
+import { useState, useRef } from "react";
+import { createPortal } from "react-dom";
+import { Calendar, MapPin, Users, ChevronRight, Shield, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 export interface EventCardData {
@@ -12,6 +14,7 @@ export interface EventCardData {
   moiRequired?:  boolean;
   color:         string;
   accentColor:   string;
+  expired?:      boolean;
 }
 
 interface Props {
@@ -20,13 +23,102 @@ interface Props {
   onApply?: () => void;
   applied?: boolean;
   listView?: boolean;
+  onEdit?:  () => void;
+  onDelete?: () => void;
+  canDelete?: boolean;
+  deleteDisabledReason?: string;
 }
 
-export function EventCard({ event, href, onApply, applied, listView }: Props) {
+/** Kebab actions menu rendered in a portal so it isn't clipped by the card's overflow. */
+function ActionsMenu({ onEdit, onDelete, canDelete, deleteDisabledReason }: {
+  onEdit?: () => void; onDelete?: () => void; canDelete?: boolean; deleteDisabledReason?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos]   = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  function toggle(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
+    }
+    setOpen(o => !o);
+  }
+
+  function pick(e: React.MouseEvent, fn?: () => void) {
+    e.preventDefault();
+    e.stopPropagation();
+    setOpen(false);
+    fn?.();
+  }
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        onClick={toggle}
+        title="Actions"
+        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 4, display: "flex", borderRadius: 6 }}
+      >
+        <MoreHorizontal size={16} />
+      </button>
+
+      {open && pos && createPortal(
+        <>
+          <div onClick={e => pick(e)} style={{ position: "fixed", inset: 0, zIndex: 3000 }} />
+          <div
+            style={{
+              position: "fixed", top: pos.top, right: pos.right, zIndex: 3001,
+              minWidth: 160, padding: 6,
+              background: "var(--surface-2)", border: "1px solid var(--border-strong)",
+              borderRadius: 10, boxShadow: "0 16px 40px rgba(0,0,0,0.45)",
+              display: "flex", flexDirection: "column", gap: 2,
+            }}
+          >
+            {onEdit && (
+              <button onClick={e => pick(e, onEdit)} style={menuItemStyle()}>
+                <Pencil size={14} /> Edit event
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={e => (canDelete ? pick(e, onDelete) : pick(e))}
+                disabled={!canDelete}
+                title={!canDelete ? deleteDisabledReason : undefined}
+                style={menuItemStyle(true, !canDelete)}
+              >
+                <Trash2 size={14} /> Delete event
+              </button>
+            )}
+          </div>
+        </>,
+        document.body,
+      )}
+    </>
+  );
+}
+
+function menuItemStyle(danger = false, disabled = false): React.CSSProperties {
+  return {
+    display: "flex", alignItems: "center", gap: 8,
+    width: "100%", textAlign: "left",
+    padding: "8px 10px", borderRadius: 7,
+    background: "none", border: "none",
+    fontSize: 13, fontWeight: 500,
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.4 : 1,
+    color: danger ? "#F87171" : "var(--text-primary)",
+  };
+}
+
+export function EventCard({ event, href, onApply, applied, listView, onEdit, onDelete, canDelete, deleteDisabledReason }: Props) {
   const isActive    = event.status === "active";
   const isCompleted = event.status === "completed";
   const statusColor = isActive ? "#22C55E" : event.status === "upcoming" ? "#F59E0B" : "#6B7280";
   const statusLabel = isActive ? "Open" : event.status === "upcoming" ? "Upcoming" : "Closed";
+  const hasActions  = !!(onEdit || onDelete);
 
   // ── List row ───────────────────────────────────────────────────
   if (listView) {
@@ -100,10 +192,8 @@ export function EventCard({ event, href, onApply, applied, listView }: Props) {
               View <ChevronRight size={13} />
             </div>
           )}
-          {!href && !onApply && (
-            <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 4, display: "flex" }}>
-              <MoreHorizontal size={16} />
-            </button>
+          {hasActions && (
+            <ActionsMenu onEdit={onEdit} onDelete={onDelete} canDelete={canDelete} deleteDisabledReason={deleteDisabledReason} />
           )}
         </div>
       </div>
@@ -143,6 +233,11 @@ export function EventCard({ event, href, onApply, applied, listView }: Props) {
               </span>
             )}
           </div>
+          {hasActions && (
+            <div style={{ flexShrink: 0, marginTop: -2 }}>
+              <ActionsMenu onEdit={onEdit} onDelete={onDelete} canDelete={canDelete} deleteDisabledReason={deleteDisabledReason} />
+            </div>
+          )}
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>

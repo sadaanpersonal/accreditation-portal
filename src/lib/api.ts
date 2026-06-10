@@ -3,8 +3,32 @@
  * Base URL is read from NEXT_PUBLIC_API_URL (defaults to http://localhost:5000).
  */
 
+import { toast } from "sonner";
+
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
 const V1   = `${BASE}/api/v1`;
+
+/**
+ * Resolve a stored file URL to something the browser can open.
+ * Local-disk storage returns root-relative paths like "/uploads/x.jpeg" which
+ * would resolve against the frontend origin (404). Prepend the API origin so
+ * the backend's static-file middleware serves them. Absolute / data URLs pass through.
+ */
+export function resolveFileUrl(url?: string | null): string {
+  if (!url) return "";
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  return `${BASE}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
+/** Surface an API/network error as a toast popup (no-op during SSR). */
+function notifyApiError(message: string) {
+  if (typeof window === "undefined") return;
+  toast.error(message);
+}
+
+function synthError<T>(message: string, statusCode: number): ApiResponse<T> {
+  return { success: false, message, data: null, errors: [], statusCode };
+}
 
 // ── Shared response wrapper ────────────────────────────────────────────────
 export interface ApiResponse<T> {
@@ -77,21 +101,50 @@ async function request<T>(
   if (tokens?.accessToken)
     headers["Authorization"] = `Bearer ${tokens.accessToken}`;
 
-  const res = await fetch(url, { ...options, headers });
+  let res: Response;
+  try {
+    res = await fetch(url, { ...options, headers });
+  } catch {
+    const msg = "Network error — please check your connection and try again.";
+    notifyApiError(msg);
+    return synthError<T>(msg, 0);
+  }
 
   // 401 → attempt token refresh once
   if (res.status === 401 && tokens?.refreshToken) {
     const refreshed = await attemptRefresh(tokens.refreshToken);
     if (refreshed) {
       headers["Authorization"] = `Bearer ${refreshed}`;
-      const retry = await fetch(url, { ...options, headers });
-      return retry.json();
+      try {
+        res = await fetch(url, { ...options, headers });
+      } catch {
+        const msg = "Network error — please try again.";
+        notifyApiError(msg);
+        return synthError<T>(msg, 0);
+      }
+    } else {
+      clearTokens();
+      if (typeof window !== "undefined") window.location.href = "/login";
+      // Redirecting — don't toast (a flash before navigation looks broken).
+      return synthError<T>("Your session has expired. Please sign in again.", 401);
     }
-    clearTokens();
-    if (typeof window !== "undefined") window.location.href = "/login";
   }
 
-  return res.json();
+  let data: ApiResponse<T>;
+  try {
+    data = await res.json();
+  } catch {
+    const msg = res.ok ? "Unexpected response from the server." : `Request failed (${res.status}).`;
+    notifyApiError(msg);
+    return synthError<T>(msg, res.status);
+  }
+
+  // Any unsuccessful API response surfaces as a popup automatically.
+  if (data && data.success === false) {
+    notifyApiError(data.message || data.errors?.[0] || "Something went wrong. Please try again.");
+  }
+
+  return data;
 }
 
 async function attemptRefresh(refreshToken: string): Promise<string | null> {

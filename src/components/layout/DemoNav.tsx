@@ -31,6 +31,14 @@ const DEMO_USERS = [
     path:     "/requestor",
     color:    "#34D399",
   },
+  {
+    label:    "Accreditor",
+    sublabel: "Watch request",
+    email:    "accredited1@demo.qa",
+    password: "Demo@1234!",
+    path:     "/accredited",
+    color:    "#F87171",
+  },
 ] as const;
 
 // ── Component ────────────────────────────────────────────────────────────────

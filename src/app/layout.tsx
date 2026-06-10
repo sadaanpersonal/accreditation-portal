@@ -1,8 +1,10 @@
 "use client";
+import "react-datepicker/dist/react-datepicker.css";
 import "./globals.css";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { AppToaster } from "@/components/ui/AppToaster";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -25,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <div className="bg-orb bg-orb-3" />
               </div>
               {children}
+              <AppToaster />
             </AuthProvider>
           </LanguageProvider>
         </ThemeProvider>

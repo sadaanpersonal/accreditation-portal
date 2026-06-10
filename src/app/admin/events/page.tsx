@@ -2,9 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Plus, LayoutGrid, List, Shield, Loader, AlertCircle, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { EventCard, type EventCardData } from "@/components/shared/EventCard";
 import { CreateEventModal } from "@/components/shared/CreateEventModal";
 import { eventsApi, type EventDto } from "@/lib/api";
+import { useAuth, Permissions } from "@/contexts/AuthContext";
+
+const DELETE_BLOCKED_REASON = "Ended events with accredited participants can't be deleted.";
 
 const CARD_COLORS  = ["linear-gradient(135deg,#4A0A1E,#8B1A3A)","linear-gradient(135deg,#1A4A8A,#2060B0)","linear-gradient(135deg,#065F46,#059669)","linear-gradient(135deg,#4C1D95,#6D28D9)","linear-gradient(135deg,#78350F,#D97706)"];
 const CARD_ACCENTS = ["#C9A84C","#60A5FA","#34D399","#A78BFA","#F59E0B"];
@@ -20,6 +24,7 @@ function toEventShape(dto: EventDto, idx: number): EventCardData {
     Cancelled: "completed",
   };
   const ci = idx % CARD_COLORS.length;
+  const expired = dto.status === "Completed" || dto.status === "Cancelled" || new Date(dto.endDate) < new Date();
   return {
     id:             dto.id,
     name:           dto.name,
@@ -30,14 +35,21 @@ function toEventShape(dto: EventDto, idx: number): EventCardData {
     accreditations: dto.accreditations ?? 0,
     color:          CARD_COLORS[ci],
     accentColor:    CARD_ACCENTS[ci],
+    expired,
   };
 }
 
 export default function AdminEventsPage() {
+  const { hasPermission } = useAuth();
+  const canCreate  = hasPermission(Permissions.EventsCreate);
+  const canEdit    = hasPermission(Permissions.EventsUpdate);
+  const canRemove  = hasPermission(Permissions.EventsDelete);
+
   const [events,       setEvents]       = useState<EventDto[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState("");
   const [modalOpen,    setModalOpen]    = useState(false);
+  const [editEvent,    setEditEvent]    = useState<EventDto | null>(null);
   const [view,         setView]         = useState<View>("card");
   const [statusFilter, setStatusFilter] = useState("all");
   const [page,         setPage]         = useState(1);
@@ -60,10 +72,31 @@ export default function AdminEventsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  function handleCreated() {
-    // Re-fetch after create so we get server-assigned ID / counts
+  function handleSaved() {
+    // Re-fetch after create/update so we get server-assigned ID / counts
     load();
     setModalOpen(false);
+    setEditEvent(null);
+  }
+
+  function openCreate() {
+    setEditEvent(null);
+    setModalOpen(true);
+  }
+
+  function handleEdit(id: string) {
+    setEditEvent(events.find(e => e.id === id) ?? null);
+    setModalOpen(true);
+  }
+
+  async function handleDelete(card: EventCardData) {
+    if (!window.confirm(`Delete "${card.name}"? This cannot be undone.`)) return;
+    const res = await eventsApi.delete(card.id);
+    if (res.success) {
+      toast.success("Event deleted.");
+      load();
+    }
+    // Failures surface automatically via the global API error toast.
   }
 
   const filtered   = events.map((e, i) => toEventShape(e, i));
@@ -105,9 +138,11 @@ export default function AdminEventsPage() {
             <RefreshCw size={14} />
           </button>
 
-          <button className="btn btn-primary btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={() => setModalOpen(true)}>
-            <Plus size={14} /> Create Event
-          </button>
+          {canCreate && (
+            <button className="btn btn-primary btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={openCreate}>
+              <Plus size={14} /> Create Event
+            </button>
+          )}
         </div>
       </div>
 
@@ -143,7 +178,16 @@ export default function AdminEventsPage() {
       {/* Card view */}
       {!loading && !error && view === "card" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-          {filtered.map(event => <EventCard key={event.id} event={event} />)}
+          {filtered.map(event => (
+            <EventCard
+              key={event.id}
+              event={event}
+              onEdit={canEdit ? () => handleEdit(event.id) : undefined}
+              onDelete={canRemove ? () => handleDelete(event) : undefined}
+              canDelete={!event.expired || event.accreditations === 0}
+              deleteDisabledReason={DELETE_BLOCKED_REASON}
+            />
+          ))}
           {filtered.length === 0 && (
             <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "48px 24px", color: "var(--text-muted)" }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
@@ -157,7 +201,17 @@ export default function AdminEventsPage() {
       {/* List view */}
       {!loading && !error && view === "list" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {filtered.map(event => <EventCard key={event.id} event={event} listView />)}
+          {filtered.map(event => (
+            <EventCard
+              key={event.id}
+              event={event}
+              listView
+              onEdit={canEdit ? () => handleEdit(event.id) : undefined}
+              onDelete={canRemove ? () => handleDelete(event) : undefined}
+              canDelete={!event.expired || event.accreditations === 0}
+              deleteDisabledReason={DELETE_BLOCKED_REASON}
+            />
+          ))}
           {filtered.length === 0 && (
             <div style={{ textAlign: "center", padding: "48px 24px", color: "var(--text-muted)", background: "var(--surface-1)", border: "1px solid var(--border)", borderRadius: 12 }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
@@ -177,7 +231,12 @@ export default function AdminEventsPage() {
         </div>
       )}
 
-      <CreateEventModal open={modalOpen} onClose={() => setModalOpen(false)} onCreate={handleCreated} />
+      <CreateEventModal
+        open={modalOpen}
+        event={editEvent}
+        onClose={() => { setModalOpen(false); setEditEvent(null); }}
+        onCreate={handleSaved}
+      />
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>

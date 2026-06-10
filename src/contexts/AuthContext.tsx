@@ -39,6 +39,29 @@ export const Roles = {
 
 export type RoleCode = typeof Roles[keyof typeof Roles];
 
+// ── Permission codes (mirrors Core/Common/PermissionCodes.cs) ─────────────────
+export const Permissions = {
+  UsersCreate:        "Users.Create",
+  UsersView:          "Users.View",
+  UsersUpdate:        "Users.Update",
+  UsersDelete:        "Users.Delete",
+  RolesManage:        "Roles.Manage",
+  RolesView:          "Roles.View",
+  LogsView:           "Logs.View",
+  EventsCreate:       "Events.Create",
+  EventsView:         "Events.View",
+  EventsUpdate:       "Events.Update",
+  EventsDelete:       "Events.Delete",
+  RequestsCreate:     "Requests.Create",
+  RequestsViewAll:    "Requests.ViewAll",
+  RequestsViewOwn:    "Requests.ViewOwn",
+  RequestsReview:     "Requests.Review",
+  RequestsBulkUpload: "Requests.BulkUpload",
+  PassesView:         "Passes.View",
+  PassesRevoke:       "Passes.Revoke",
+  InvitationsManage:  "Invitations.Manage",
+} as const;
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Decode the JWT payload (no signature verification — server already did that). */

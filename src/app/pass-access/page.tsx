@@ -6,7 +6,8 @@ import {
   Eye, EyeOff, CheckCircle, Loader, AlertCircle,
   ShieldCheck, LogIn, UserPlus, Lock,
 } from "lucide-react";
-import { passAccessApi, authApi, saveTokens } from "@/lib/api";
+import { passAccessApi } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ── types ────────────────────────────────────────────────────────────────────
 type Mode = "loading" | "error" | "register" | "login" | "done-register" | "done-login";
@@ -49,6 +50,7 @@ function PassAccessContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const token        = searchParams.get("token") ?? "";
+  const { login }    = useAuth();
 
   const [mode,        setMode]       = useState<Mode>("loading");
   const [apiError,    setApiError]   = useState("");
@@ -98,18 +100,19 @@ function PassAccessContent() {
   }
 
   // ── Login submit ────────────────────────────────────────────────────────
+  // Use AuthContext.login() so it saves tokens + user to localStorage,
+  // updates auth state, and redirects to /accredited — all in one call.
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     if (!info) return;
     setApiError(""); setSubmitting(true);
-    const res = await authApi.login(info.email, loginPw);
+    const result = await login(info.email, loginPw);
     setSubmitting(false);
-    if (res.success && res.data) {
-      saveTokens({ accessToken: res.data.accessToken, refreshToken: res.data.refreshToken });
+    if (result.success) {
       setMode("done-login");
-      setTimeout(() => router.push("/accredited/passes"), 1200);
+      // AuthContext.login() already called router.push("/accredited")
     } else {
-      setApiError(res.message ?? "Login failed. Please check your password.");
+      setApiError(result.message ?? "Login failed. Please check your password.");
     }
   }
 
@@ -181,12 +184,14 @@ function PassAccessContent() {
     </div>
   );
 
-  // ── Render: Login done (auto-redirect) ──────────────────────────────────
+  // ── Render: Login done (auto-redirect handled by AuthContext) ───────────
   if (mode === "done-login") return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ textAlign: "center", color: "var(--text-muted)" }}>
         <CheckCircle size={32} color="#22C55E" style={{ margin: "0 auto 12px", display: "block" }} />
-        <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Signed in! Redirecting to your passes…</p>
+        <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Signed in! Redirecting to your dashboard…</p>
+        <Loader size={16} style={{ animation: "spin 1s linear infinite", margin: "10px auto 0", display: "block" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     </div>
   );

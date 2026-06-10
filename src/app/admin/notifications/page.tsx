@@ -67,7 +67,7 @@ export default function AdminNotificationsPage() {
   const unreadCount = items.filter(n => !n.read).length;
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto" }}>
+    <div style={{ maxWidth: 940, margin: "0 auto" }}>
       <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
         <Bell size={20} /> Admin Notifications
       </h1>
