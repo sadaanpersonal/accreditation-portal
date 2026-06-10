@@ -393,6 +393,50 @@ export const usersApi = {
     request<boolean>(`${V1}/users/${id}`, { method: "DELETE" }),
 };
 
+// ── Bulk Upload ──────────────────────────────────────────────────────────────
+export interface BulkUploadRow {
+  rowNumber:     number;
+  firstName:     string;
+  lastName:      string;
+  email:         string;
+  nationality:   string;
+  passportNo:    string;
+  dateOfBirth:   string;
+  role:          string;
+  phone?:        string | null;
+  organization?: string | null;
+  venue?:        string | null;
+  isValid:       boolean;
+  error?:        string | null;
+}
+
+export interface BulkUploadPreviewResponse {
+  totalRows:   number;
+  validRows:   number;
+  invalidRows: number;
+  rows:        BulkUploadRow[];
+}
+
+export interface BulkUploadProcessResponse {
+  created: number;
+  skipped: number;
+  errors:  string[];
+}
+
+export const bulkUploadApi = {
+  preview: (base64Content: string, eventId: string) =>
+    request<BulkUploadPreviewResponse>(`${V1}/bulk-upload/preview`, {
+      method: "POST",
+      body:   JSON.stringify({ base64Content, eventId }),
+    }),
+
+  process: (eventId: string, rows: BulkUploadRow[]) =>
+    request<BulkUploadProcessResponse>(`${V1}/bulk-upload/process`, {
+      method: "POST",
+      body:   JSON.stringify({ eventId, rows }),
+    }),
+};
+
 // ── Notifications ────────────────────────────────────────────────────────────
 export interface NotificationDto {
   id:          string;
