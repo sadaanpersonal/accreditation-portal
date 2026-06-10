@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { X, Check, Calendar, MapPin, Shield, Palette, Tag, Loader } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { eventsApi } from "@/lib/api";
@@ -35,6 +35,22 @@ const EMPTY = {
   moiRequired: false,
   themeIdx: 0,
 };
+
+// Field is defined at module scope so React always sees the same component
+// identity across renders. If it were defined inside CreateEventModal the arrow
+// function would be a new reference on every state change, causing React to
+// unmount/remount every Field wrapper — and all their inputs — on each keystroke.
+function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-muted)" }}>
+        {label}
+      </label>
+      {children}
+      {error && <span style={{ fontSize: 11, color: "#F87171" }}>{error}</span>}
+    </div>
+  );
+}
 
 export function CreateEventModal({ open, onClose, onCreate }: Props) {
   const [form, setForm]     = useState(EMPTY);
@@ -88,16 +104,6 @@ export function CreateEventModal({ open, onClose, onCreate }: Props) {
     setApiErr("");
     onClose();
   }
-
-  const Field = ({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-muted)" }}>
-        {label}
-      </label>
-      {children}
-      {error && <span style={{ fontSize: 11, color: "#F87171" }}>{error}</span>}
-    </div>
-  );
 
   return (
     <AnimatePresence>
