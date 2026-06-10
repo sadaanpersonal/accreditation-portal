@@ -100,8 +100,8 @@ export function Sidebar({ sections, open, onClose, userName, userRole, userIniti
           <div className="sidebar-user">
             <div className="user-avatar">{userInitials}</div>
             <div className="user-info">
-              <strong>{userName}</strong>
-              <span>{userRole}</span>
+              <strong>{userName}</strong> <br/>
+              <span className="user-role">{userRole}</span>
             </div>
             <button
               onClick={logout}

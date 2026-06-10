@@ -28,7 +28,7 @@ export default function AccreditedLayout({ children }: { children: React.ReactNo
     <AppLayout
       navSections={NAV}
       userName={fullName}
-      userRole="Accredited · QOC Portal"
+      userRole="Accredited User"
       userInitials={initials}
       brandTitle="QOC Portal"
       brandSub="Accredited User"
