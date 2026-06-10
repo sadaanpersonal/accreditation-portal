@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Search, UserPlus, Shield, ShieldCheck, User, Loader, RefreshCw } from "lucide-react";
+import { Search, UserPlus, Shield, ShieldCheck, User, Loader, RefreshCw, Users as UsersIcon, BadgeCheck } from "lucide-react";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
 import { usersApi, type UserDto } from "@/lib/api";
 import Link from "next/link";
+
+const ACCREDITED_ROLE = "ACCREDITED";
+type Tab = "staff" | "accredited";
 
 const ROLE_STYLE: Record<string, { color: string; bg: string; border: string }> = {
   SUPER_ADMIN:  { color: "#C9A84C", bg: "rgba(201,168,76,0.1)",   border: "rgba(201,168,76,0.3)" },
@@ -32,6 +35,7 @@ function roleIcon(role: string | null | undefined, color: string) {
 }
 
 export default function UsersPage() {
+  const [tab,         setTab]         = useState<Tab>("staff");
   const [users,       setUsers]       = useState<UserDto[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState("");
@@ -41,12 +45,21 @@ export default function UsersPage() {
   const [totalPages,  setTotalPages]  = useState(1);
   const [totalCount,  setTotalCount]  = useState(0);
 
+  const isAccredited = tab === "accredited";
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     const params: Record<string, string | number> = { pageNumber: page, pageSize: 25 };
     if (search) params.searchTerm = search;
-    if (roleFilter !== "all") params.role = roleFilter;
+    if (isAccredited) {
+      // Accredited holders only — kept separate as there can be very many.
+      params.role = ACCREDITED_ROLE;
+    } else {
+      // Staff & admins — never mix in accredited holders.
+      params.excludeRole = ACCREDITED_ROLE;
+      if (roleFilter !== "all") params.role = roleFilter;
+    }
     const res = await usersApi.list(params);
     setLoading(false);
     if (res.success && res.data) {
@@ -56,11 +69,20 @@ export default function UsersPage() {
     } else {
       setError(res.message ?? "Failed to load users.");
     }
-  }, [page, search, roleFilter]);
+  }, [page, search, roleFilter, isAccredited]);
 
   useEffect(() => { load(); }, [load]);
 
-  const roleOptions = Array.from(new Set(users.map(u => u.role))).filter((r): r is string => !!r);
+  function switchTab(next: Tab) {
+    if (next === tab) return;
+    setTab(next);
+    setPage(1);
+    setSearch("");
+    setRoleFilter("all");
+  }
+
+  const roleOptions = Array.from(new Set(users.map(u => u.role)))
+    .filter((r): r is string => !!r && r !== ACCREDITED_ROLE);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -68,7 +90,9 @@ export default function UsersPage() {
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Users</h1>
           <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "3px 0 0" }}>
-            {loading ? "…" : `${totalCount} total · ${users.filter(u => u.isActive).length} active`}
+            {loading
+              ? "…"
+              : `${totalCount} ${isAccredited ? "accredited" : "staff"} ${totalCount === 1 ? "user" : "users"} · ${users.filter(u => u.isActive).length} active on this page`}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -79,8 +103,31 @@ export default function UsersPage() {
         </div>
       </div>
 
+      {/* Tabs: keep staff/admins separate from the (potentially large) accredited list */}
+      <div style={{ display: "flex", gap: 4, background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10, padding: 3, alignSelf: "flex-start" }}>
+        {([
+          { key: "staff",      label: "Staff & Admins", icon: <UsersIcon size={14} /> },
+          { key: "accredited", label: "Accredited Users", icon: <BadgeCheck size={14} /> },
+        ] as { key: Tab; label: string; icon: React.ReactNode }[]).map(t => (
+          <button
+            key={t.key}
+            onClick={() => switchTab(t.key)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "7px 14px", borderRadius: 7, border: "none", cursor: "pointer",
+              fontSize: 13, fontWeight: 600,
+              background: tab === t.key ? "var(--surface-4)" : "transparent",
+              color: tab === t.key ? "var(--text-primary)" : "var(--text-muted)",
+              transition: "all 0.15s",
+            }}
+          >
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
       {/* Role stats */}
-      {roleOptions.length > 0 && (
+      {!isAccredited && roleOptions.length > 0 && (
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {roleOptions.map(r => {
             const rs = roleStyle(r);
@@ -102,10 +149,12 @@ export default function UsersPage() {
               <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
               <input className="form-control" style={{ paddingLeft: 32, margin: 0 }} placeholder="Search by name or email…" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
             </div>
-            <select className="form-control" style={{ margin: 0, width: "auto" }} value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }}>
-              <option value="all">All Roles</option>
-              {roleOptions.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
-            </select>
+            {!isAccredited && (
+              <select className="form-control" style={{ margin: 0, width: "auto" }} value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }}>
+                <option value="all">All Roles</option>
+                {roleOptions.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
+              </select>
+            )}
           </div>
           <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>{loading ? "…" : `${users.length} shown`}</span>
         </CardHeader>
@@ -167,7 +216,9 @@ export default function UsersPage() {
                   );
                 })}
                 {users.length === 0 && (
-                  <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--text-muted)", padding: 32 }}>No users found</td></tr>
+                  <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--text-muted)", padding: 32 }}>
+                    No {isAccredited ? "accredited users" : "staff users"} found
+                  </td></tr>
                 )}
               </tbody>
             </table>

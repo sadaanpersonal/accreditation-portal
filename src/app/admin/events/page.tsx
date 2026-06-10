@@ -5,10 +5,11 @@ import { Plus, LayoutGrid, List, Shield, Loader, AlertCircle, RefreshCw } from "
 import { toast } from "sonner";
 import { EventCard, type EventCardData } from "@/components/shared/EventCard";
 import { CreateEventModal } from "@/components/shared/CreateEventModal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { eventsApi, type EventDto } from "@/lib/api";
 import { useAuth, Permissions } from "@/contexts/AuthContext";
 
-const DELETE_BLOCKED_REASON = "Ended events with accredited participants can't be deleted.";
+const DELETE_BLOCKED_REASON = "Events with accredited users can't be deleted.";
 
 const CARD_COLORS  = ["linear-gradient(135deg,#4A0A1E,#8B1A3A)","linear-gradient(135deg,#1A4A8A,#2060B0)","linear-gradient(135deg,#065F46,#059669)","linear-gradient(135deg,#4C1D95,#6D28D9)","linear-gradient(135deg,#78350F,#D97706)"];
 const CARD_ACCENTS = ["#C9A84C","#60A5FA","#34D399","#A78BFA","#F59E0B"];
@@ -50,6 +51,8 @@ export default function AdminEventsPage() {
   const [error,        setError]        = useState("");
   const [modalOpen,    setModalOpen]    = useState(false);
   const [editEvent,    setEditEvent]    = useState<EventDto | null>(null);
+  const [confirmEvent, setConfirmEvent] = useState<EventCardData | null>(null);
+  const [deleting,     setDeleting]     = useState(false);
   const [view,         setView]         = useState<View>("card");
   const [statusFilter, setStatusFilter] = useState("all");
   const [page,         setPage]         = useState(1);
@@ -89,9 +92,16 @@ export default function AdminEventsPage() {
     setModalOpen(true);
   }
 
-  async function handleDelete(card: EventCardData) {
-    if (!window.confirm(`Delete "${card.name}"? This cannot be undone.`)) return;
-    const res = await eventsApi.delete(card.id);
+  function handleDelete(card: EventCardData) {
+    setConfirmEvent(card);
+  }
+
+  async function doDelete() {
+    if (!confirmEvent) return;
+    setDeleting(true);
+    const res = await eventsApi.delete(confirmEvent.id);
+    setDeleting(false);
+    setConfirmEvent(null);
     if (res.success) {
       toast.success("Event deleted.");
       load();
@@ -184,7 +194,7 @@ export default function AdminEventsPage() {
               event={event}
               onEdit={canEdit ? () => handleEdit(event.id) : undefined}
               onDelete={canRemove ? () => handleDelete(event) : undefined}
-              canDelete={!event.expired || event.accreditations === 0}
+              canDelete={event.accreditations === 0}
               deleteDisabledReason={DELETE_BLOCKED_REASON}
             />
           ))}
@@ -208,7 +218,7 @@ export default function AdminEventsPage() {
               listView
               onEdit={canEdit ? () => handleEdit(event.id) : undefined}
               onDelete={canRemove ? () => handleDelete(event) : undefined}
-              canDelete={!event.expired || event.accreditations === 0}
+              canDelete={event.accreditations === 0}
               deleteDisabledReason={DELETE_BLOCKED_REASON}
             />
           ))}
@@ -236,6 +246,17 @@ export default function AdminEventsPage() {
         event={editEvent}
         onClose={() => { setModalOpen(false); setEditEvent(null); }}
         onCreate={handleSaved}
+      />
+
+      <ConfirmDialog
+        open={!!confirmEvent}
+        danger
+        title="Delete event?"
+        message={<>This will permanently remove <strong>{confirmEvent?.name}</strong>. This action cannot be undone.</>}
+        confirmLabel="Delete"
+        loading={deleting}
+        onConfirm={doDelete}
+        onClose={() => setConfirmEvent(null)}
       />
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
