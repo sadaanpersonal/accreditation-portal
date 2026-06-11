@@ -1,7 +1,8 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ChevronLeft, Loader, FileText, Copy, Eye } from "lucide-react";
+import { ChevronLeft, Loader, FileText, Copy, Eye, MapPin, MessageSquare, Pencil } from "lucide-react";
+import { toast } from "sonner";
 import Link from "next/link";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
@@ -9,7 +10,9 @@ import { RoleTag } from "@/components/ui/RoleTag";
 import { ApprovalPipeline, type PipelineState } from "@/components/shared/ApprovalPipeline";
 import { Modal } from "@/components/ui/Modal";
 import { DocumentViewerModal } from "@/components/shared/DocumentViewerModal";
-import { requestsApi, pipelineApi, resolveFileUrl, type RequestDto } from "@/lib/api";
+import { EditApplicationModal } from "@/components/shared/EditApplicationModal";
+import { VenueMap, VenueSelect } from "@/components/shared/VenueMap";
+import { requestsApi, pipelineApi, venuesApi, resolveFileUrl, type RequestDto, type VenueDto } from "@/lib/api";
 
 function toPipelineState(req: RequestDto): PipelineState {
   return {
@@ -66,6 +69,18 @@ export default function AdminRequestDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [viewDoc, setViewDoc] = useState<{ url: string; fileName: string } | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+
+  // Zone-owner stage: pick a venue + zones from the managed venue library
+  const [venues, setVenues] = useState<VenueDto[]>([]);
+  const [zoneVenueId, setZoneVenueId] = useState("");
+  const [selectedZoneIds, setSelectedZoneIds] = useState<string[]>([]);
+  const [zoneModalOpen, setZoneModalOpen] = useState(false);
+
+  const zoneVenue = venues.find(v => v.id === zoneVenueId) ?? null;
+  const selectedZoneLabels = zoneVenue
+    ? zoneVenue.zones.filter((z, i) => selectedZoneIds.includes(z.id ?? `zone-${i}`)).map(z => z.label)
+    : [];
 
   async function load() {
     setLoading(true);
@@ -87,6 +102,32 @@ export default function AdminRequestDetailPage() {
   }
 
   useEffect(() => { load(); }, [id]);
+
+  useEffect(() => {
+    venuesApi.list().then(res => {
+      if (res.success && res.data) setVenues(res.data);
+    });
+  }, []);
+
+  // Once the request and venue library are both loaded, pre-select the venue
+  // (matched by stored name) and the zones whose labels were requested.
+  useEffect(() => {
+    if (!req || venues.length === 0) return;
+    const venueName = (req.assignedVenue ?? "").trim().toLowerCase();
+    const matched = venueName ? venues.find(v => v.name.trim().toLowerCase() === venueName) : null;
+    if (!matched) return;
+    setZoneVenueId(matched.id);
+    const requested = (req.zoneAccess ?? "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+    const ids = matched.zones
+      .filter(z => requested.includes(z.label.trim().toLowerCase()))
+      .map((z, i) => z.id ?? `zone-${i}`);
+    setSelectedZoneIds(ids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [req, venues]);
+
+  function toggleZone(zid: string) {
+    setSelectedZoneIds(prev => prev.includes(zid) ? prev.filter(z => z !== zid) : [...prev, zid]);
+  }
 
   function handleCloneRequest() {
     if (!req) return;
@@ -132,7 +173,12 @@ export default function AdminRequestDetailPage() {
 
   function handleApprove() {
     const extra = req?.currentStage === 2
-      ? { zoneAccess: zoneInput || undefined, assignedVenue: venueInput || undefined }
+      ? {
+          // Prefer the visual venue/zone picker; fall back to the free-text fields
+          // when the stored venue isn't in the managed library.
+          zoneAccess:    zoneVenue ? (selectedZoneLabels.join(", ") || undefined) : (zoneInput || undefined),
+          assignedVenue: zoneVenue ? zoneVenue.name : (venueInput || undefined),
+        }
       : undefined;
     doReview("Approved", undefined, extra);
   }
@@ -162,19 +208,43 @@ export default function AdminRequestDetailPage() {
   const zones = req.zoneAccess ? req.zoneAccess.split(",").map(z => z.trim()).filter(Boolean) : [];
 
   const zoneContent = req.currentStage === 2 && !isTerminated && !req.isInfoRequested ? (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <input
-        className="form-control form-control-sm"
-        placeholder="Zone access (e.g. Zone A, Zone B)"
-        value={zoneInput}
-        onChange={e => setZoneInput(e.target.value)}
-      />
-      <input
-        className="form-control form-control-sm"
-        placeholder="Assigned venue"
-        value={venueInput}
-        onChange={e => setVenueInput(e.target.value)}
-      />
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div>
+        <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: 4 }}>Venue</label>
+        <VenueSelect
+          venues={venues}
+          value={zoneVenueId}
+          onChange={v => { setZoneVenueId(v); setSelectedZoneIds([]); }}
+        />
+      </div>
+
+      {zoneVenue ? (
+        <div>
+          <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: 6 }}>
+            Granted Zones
+          </label>
+          {selectedZoneLabels.length > 0 ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+              {selectedZoneLabels.map(z => (
+                <span key={z} style={{ padding: "3px 9px", borderRadius: 12, fontSize: 11, fontWeight: 600, background: "rgba(201,168,76,0.12)", border: "1px solid rgba(201,168,76,0.3)", color: "var(--gold)" }}>{z}</span>
+              ))}
+            </div>
+          ) : (
+            <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>No zones selected yet.</p>
+          )}
+          <button className="btn btn-secondary btn-sm btn-full" onClick={() => setZoneModalOpen(true)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+            <MapPin size={13} /> Select Zones ({selectedZoneIds.length})
+          </button>
+        </div>
+      ) : (
+        // Fallback for venues not in the managed library (e.g. legacy / free text)
+        <input
+          className="form-control form-control-sm"
+          placeholder="Zone access (e.g. Zone A, Zone B)"
+          value={zoneInput}
+          onChange={e => setZoneInput(e.target.value)}
+        />
+      )}
     </div>
   ) : null;
 
@@ -282,6 +352,30 @@ export default function AdminRequestDetailPage() {
                     </div>
                   </div>
                 ))}
+              </CardBody>
+            </GlassCard>
+          )}
+
+          {/* Information Requested — let the creator/admin amend & resubmit */}
+          {req.isInfoRequested && (
+            <GlassCard>
+              <CardHeader>
+                <h2 style={{ fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, color: "#F59E0B" }}>
+                  <MessageSquare size={15} /> Information Requested
+                </h2>
+              </CardHeader>
+              <CardBody>
+                {req.infoRequestNote && (
+                  <p style={{ color: "var(--text-primary)", lineHeight: 1.6, margin: "0 0 14px", padding: "10px 12px", background: "rgba(245,158,11,0.06)", borderRadius: "var(--radius-sm)", border: "1px solid rgba(245,158,11,0.2)" }}>
+                    {req.infoRequestNote}
+                  </p>
+                )}
+                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 12px" }}>
+                  This application is on hold. Update the details and resubmit it to the pipeline.
+                </p>
+                <button className="btn btn-primary btn-sm" onClick={() => setEditOpen(true)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Pencil size={14} /> Edit &amp; Resubmit
+                </button>
               </CardBody>
             </GlassCard>
           )}
@@ -401,6 +495,33 @@ export default function AdminRequestDetailPage() {
         src={viewDoc?.url ?? ""}
         fileName={viewDoc?.fileName}
       />
+
+      {/* Edit / resubmit a held application */}
+      <EditApplicationModal
+        open={editOpen}
+        request={req}
+        onClose={() => setEditOpen(false)}
+        onSaved={() => { setEditOpen(false); toast.success("Application updated and resubmitted for review."); load(); }}
+      />
+
+      {/* Zone selection (Zone Owner stage) */}
+      <Modal open={zoneModalOpen} onClose={() => setZoneModalOpen(false)} title={`Select Access Zones — ${zoneVenue?.name ?? ""}`} maxWidth="640px">
+        {zoneVenue ? (
+          <>
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
+              Click zones on the map or the cards below to grant access for this accreditation.
+            </p>
+            <VenueMap venue={zoneVenue} selectedZones={selectedZoneIds} onToggle={toggleZone} />
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+              <button className="btn btn-primary btn-sm" onClick={() => setZoneModalOpen(false)}>
+                Done · {selectedZoneIds.length} selected
+              </button>
+            </div>
+          </>
+        ) : (
+          <p style={{ fontSize: 13, color: "var(--text-muted)" }}>Select a venue first.</p>
+        )}
+      </Modal>
     </div>
   );
 }

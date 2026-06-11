@@ -7,7 +7,8 @@ import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { Stepper } from "@/components/ui/Stepper";
 import { DocumentUploader, type UploadedDoc } from "@/components/shared/DocumentUploader";
-import { eventsApi, requestsApi, type EventDto } from "@/lib/api";
+import { VenueMap, VenueSelect } from "@/components/shared/VenueMap";
+import { eventsApi, requestsApi, venuesApi, type EventDto, type VenueDto } from "@/lib/api";
 
 const ROLES        = ["Athlete", "Media", "VIP", "Staff", "Official", "Coach"];
 const NATIONALITIES = [
@@ -67,6 +68,10 @@ function AdminNewRequestForm() {
   const [step,       setStep]       = useState(0);
   const [events,     setEvents]     = useState<EventDto[]>([]);
   const [evLoading,  setEvLoading]  = useState(true);
+  const [venues,     setVenues]     = useState<VenueDto[]>([]);
+  const [venuesLoading, setVenuesLoading] = useState(true);
+  const [venueId,    setVenueId]    = useState("");
+  const [zoneIds,    setZoneIds]    = useState<string[]>([]);
   const [form,       setForm]       = useState<FormState>(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState("");
@@ -85,6 +90,22 @@ function AdminNewRequestForm() {
   }, []);
 
   useEffect(() => { loadEvents(); }, [loadEvents]);
+
+  useEffect(() => {
+    venuesApi.list().then(res => {
+      setVenuesLoading(false);
+      if (res.success && res.data) setVenues(res.data);
+    });
+  }, []);
+
+  const selectedVenue = venues.find(v => v.id === venueId) ?? null;
+  const selectedZoneLabels = selectedVenue
+    ? selectedVenue.zones.filter((z, i) => zoneIds.includes(z.id ?? `zone-${i}`)).map(z => z.label)
+    : [];
+
+  function toggleZone(zid: string) {
+    setZoneIds(prev => prev.includes(zid) ? prev.filter(z => z !== zid) : [...prev, zid]);
+  }
 
   // Load clone prefill (once) from sessionStorage
   useEffect(() => {
@@ -181,7 +202,9 @@ function AdminNewRequestForm() {
       phone:         form.phone.trim() || undefined,
       organization:  form.organization.trim() || undefined,
       position:      form.position.trim() || undefined,
-      assignedVenue: form.assignedVenue.trim() || undefined,
+      // Store the readable venue name and zone labels (not internal ids)
+      assignedVenue: selectedVenue?.name || undefined,
+      zoneAccess:    selectedZoneLabels.join(", ") || undefined,
       documents:     docs.map(d => ({ base64Content: d.base64Content, fileName: d.fileName, type: d.type })),
     });
 
@@ -209,7 +232,7 @@ function AdminNewRequestForm() {
           Accreditation request for <strong>{form.firstName} {form.lastName}</strong> has been submitted and entered the FA Owner review stage.
         </p>
         <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-          <button className="btn btn-secondary" onClick={() => { setSubmitted(false); setErrors({}); setStep(0); setDocs([]); setForm(INITIAL_FORM); }}>
+          <button className="btn btn-secondary" onClick={() => { setSubmitted(false); setErrors({}); setStep(0); setDocs([]); setForm(INITIAL_FORM); setVenueId(""); setZoneIds([]); }}>
             Submit Another
           </button>
           {createdId && (
@@ -341,16 +364,19 @@ function AdminNewRequestForm() {
                   <p style={{ fontSize: 11, color: "#F59E0B", marginTop: 4 }}>No other active events available.</p>
                 )}
               </div>
-              <div className="form-group">
-                <label className="form-label">Assigned Venue</label>
-                <input className="form-control" placeholder="e.g. Khalifa International Stadium" value={form.assignedVenue} onChange={e => set("assignedVenue", e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Zone Access</label>
-                <input className="form-control" placeholder="e.g. Zone A, Zone B (set during review)" value={form.zoneAccess} onChange={e => set("zoneAccess", e.target.value)} />
-                <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>Zone access can also be assigned during the review pipeline.</p>
+              <div className="form-group" style={{ gridColumn: "1 / -1" }}>
+                <label className="form-label">Venue (optional)</label>
+                <VenueSelect venues={venues} loading={venuesLoading} value={venueId} onChange={v => { setVenueId(v); setZoneIds([]); }} />
               </div>
             </div>
+
+            {selectedVenue && (
+              <div style={{ marginTop: 16 }}>
+                <label className="form-label">Zone Access</label>
+                <VenueMap venue={selectedVenue} selectedZones={zoneIds} onToggle={toggleZone} />
+                <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>Zone access can also be adjusted during the review pipeline.</p>
+              </div>
+            )}
           </CardBody>
         </GlassCard>
       )}
@@ -386,8 +412,8 @@ function AdminNewRequestForm() {
             <ReviewSection title="Event & Role" onEdit={() => setStep(1)} rows={[
               ["Role", form.role || "—"],
               ["Event", selectedEvent?.name ?? "—"],
-              ["Assigned Venue", form.assignedVenue || "—"],
-              ["Zone Access", form.zoneAccess || "—"],
+              ["Assigned Venue", selectedVenue?.name ?? "—"],
+              ["Zone Access", selectedZoneLabels.length ? selectedZoneLabels.join(", ") : "—"],
             ]} />
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>

@@ -448,6 +448,51 @@ export const usersApi = {
     request<boolean>(`${V1}/users/${id}`, { method: "DELETE" }),
 };
 
+// ── Venues ───────────────────────────────────────────────────────────────────
+export interface VenueZoneDto {
+  id?:          string;
+  label:        string;
+  description?: string;
+  color:        string;
+  x:            number;
+  y:            number;
+  width:        number;
+  height:       number;
+}
+
+export interface VenueDto {
+  id:           string;
+  name:         string;
+  description?: string;
+  location?:    string;
+  createdAt:    string;
+  zones:        VenueZoneDto[];
+}
+
+export interface SaveVenuePayload {
+  name:         string;
+  description?: string;
+  location?:    string;
+  zones:        Omit<VenueZoneDto, "id">[];
+}
+
+export const venuesApi = {
+  list: () =>
+    request<VenueDto[]>(`${V1}/venues`),
+
+  get: (id: string) =>
+    request<VenueDto>(`${V1}/venues/${id}`),
+
+  create: (body: SaveVenuePayload) =>
+    request<VenueDto>(`${V1}/venues`, { method: "POST", body: JSON.stringify(body) }),
+
+  update: (id: string, body: SaveVenuePayload) =>
+    request<VenueDto>(`${V1}/venues/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+
+  delete: (id: string) =>
+    request<boolean>(`${V1}/venues/${id}`, { method: "DELETE" }),
+};
+
 // ── Roles ────────────────────────────────────────────────────────────────────
 export interface RoleDto {
   id:           string;

@@ -9,7 +9,7 @@ import { VenueMap, VenueSelect } from "@/components/shared/VenueMap";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { Stepper } from "@/components/ui/Stepper";
 import { DocumentUploader, type UploadedDoc } from "@/components/shared/DocumentUploader";
-import { requestsApi, eventsApi, type EventDto } from "@/lib/api";
+import { requestsApi, eventsApi, venuesApi, type EventDto, type VenueDto } from "@/lib/api";
 
 const ROLES = ["Athlete", "Media", "VIP", "Staff", "Official", "Coach"];
 const NATIONALITIES = ["Qatar", "Saudi Arabia", "UAE", "Bahrain", "Kuwait", "Oman", "Jordan", "Egypt", "Tunisia", "Morocco", "Other"];
@@ -42,6 +42,8 @@ function NewRequestForm() {
 
   const [step,      setStep]      = useState(0);
   const [events,    setEvents]    = useState<EventDto[]>([]);
+  const [venues,    setVenues]    = useState<VenueDto[]>([]);
+  const [venuesLoading, setVenuesLoading] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error,     setError]     = useState("");
@@ -60,6 +62,10 @@ function NewRequestForm() {
   useEffect(() => {
     eventsApi.list({ pageNumber: 1, pageSize: 50, status: "Active" }).then(res => {
       if (res.success && res.data) setEvents(res.data.items);
+    });
+    venuesApi.list().then(res => {
+      setVenuesLoading(false);
+      if (res.success && res.data) setVenues(res.data);
     });
   }, []);
 
@@ -173,8 +179,9 @@ function NewRequestForm() {
       phone:          form.phone.trim() || undefined,
       organization:   form.organization.trim() || undefined,
       position:       form.position.trim() || undefined,
-      assignedVenue:  form.venueId || undefined,
-      zoneAccess:     form.zones.join(", ") || undefined,
+      // Store the readable venue name and zone labels (not internal ids)
+      assignedVenue:  selectedVenue?.name || undefined,
+      zoneAccess:     selectedZoneLabels.join(", ") || undefined,
       documents:      docs.map(d => ({ base64Content: d.base64Content, fileName: d.fileName, type: d.type })),
     });
 
@@ -189,6 +196,10 @@ function NewRequestForm() {
 
   const selectableEvents = events.filter(ev => ev.id !== excludeEventId);
   const selectedEvent = events.find(ev => ev.id === form.eventId);
+  const selectedVenue = venues.find(v => v.id === form.venueId) ?? null;
+  const selectedZoneLabels = selectedVenue
+    ? selectedVenue.zones.filter((z, i) => form.zones.includes(z.id ?? `zone-${i}`)).map(z => z.label)
+    : [];
 
   if (submitted) {
     return (
@@ -328,14 +339,14 @@ function NewRequestForm() {
               </div>
               <div className="form-group" style={{ gridColumn: "1 / -1" }}>
                 <label className="form-label">Venue (optional)</label>
-                <VenueSelect value={form.venueId} onChange={v => set("venueId", v)} />
+                <VenueSelect venues={venues} loading={venuesLoading} value={form.venueId} onChange={v => set("venueId", v)} />
               </div>
             </div>
 
-            {form.venueId && (
+            {selectedVenue && (
               <div style={{ marginTop: 16 }}>
                 <label className="form-label">Zone Access</label>
-                <VenueMap venueId={form.venueId} selectedZones={form.zones} onToggle={toggleZone} />
+                <VenueMap venue={selectedVenue} selectedZones={form.zones} onToggle={toggleZone} />
               </div>
             )}
 
@@ -378,7 +389,8 @@ function NewRequestForm() {
             <ReviewSection title="Event & Role" onEdit={() => setStep(1)} rows={[
               ["Role", form.role || "—"],
               ["Event", selectedEvent?.name ?? "—"],
-              ["Zones", form.zones.length ? form.zones.join(", ") : "—"],
+              ["Venue", selectedVenue?.name ?? "—"],
+              ["Zones", selectedZoneLabels.length ? selectedZoneLabels.join(", ") : "—"],
               ["Notes", form.notes || "—"],
             ]} />
             <div>

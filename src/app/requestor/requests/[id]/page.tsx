@@ -1,13 +1,15 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ChevronLeft, MessageSquare, Loader, Copy, Eye } from "lucide-react";
+import { ChevronLeft, MessageSquare, Loader, Copy, Eye, Pencil } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
 import { RoleTag } from "@/components/ui/RoleTag";
 import { ApprovalPipeline, type PipelineState } from "@/components/shared/ApprovalPipeline";
 import { DocumentViewerModal } from "@/components/shared/DocumentViewerModal";
+import { EditApplicationModal } from "@/components/shared/EditApplicationModal";
 import { requestsApi, pipelineApi, resolveFileUrl, type RequestDto } from "@/lib/api";
 
 function toPipelineState(req: RequestDto): PipelineState {
@@ -57,6 +59,7 @@ export default function RequestDetailPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [viewDoc, setViewDoc] = useState<{ url: string; fileName: string } | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -272,19 +275,24 @@ export default function RequestDetailPage() {
                     <textarea
                       className="form-control"
                       style={{ minHeight: 90, resize: "vertical", marginBottom: 10 }}
-                      placeholder="Type your response here…"
+                      placeholder="Type a quick reply, or use “Edit Application” to change details…"
                       value={responseNote}
                       onChange={e => setResponseNote(e.target.value)}
                     />
                     {submitError && <p style={{ color: "#EF4444", fontSize: 12, marginBottom: 8 }}>{submitError}</p>}
-                    <button
-                      className="btn btn-primary"
-                      onClick={handleSubmitResponse}
-                      disabled={submitting || !responseNote.trim()}
-                    >
-                      {submitting ? <Loader size={14} className="spin" /> : null}
-                      {submitting ? " Submitting…" : "Submit Response"}
-                    </button>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button
+                        className="btn btn-primary"
+                        onClick={handleSubmitResponse}
+                        disabled={submitting || !responseNote.trim()}
+                      >
+                        {submitting ? <Loader size={14} className="spin" /> : null}
+                        {submitting ? " Submitting…" : "Submit Response"}
+                      </button>
+                      <button className="btn btn-secondary" onClick={() => setEditOpen(true)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <Pencil size={14} /> Edit Application
+                      </button>
+                    </div>
                   </>
                 )}
               </CardBody>
@@ -321,6 +329,14 @@ export default function RequestDetailPage() {
         onClose={() => setViewDoc(null)}
         src={viewDoc?.url ?? ""}
         fileName={viewDoc?.fileName}
+      />
+
+      {/* Edit / resubmit application */}
+      <EditApplicationModal
+        open={editOpen}
+        request={req}
+        onClose={() => setEditOpen(false)}
+        onSaved={() => { setEditOpen(false); toast.success("Application updated and resubmitted for review."); load(); }}
       />
     </div>
   );

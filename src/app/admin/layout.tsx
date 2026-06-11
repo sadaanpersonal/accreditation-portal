@@ -2,7 +2,7 @@
 
 import {
   LayoutDashboard, PlusCircle, Upload, FolderOpen,
-  ClipboardCheck, Send, CalendarDays, Users, Settings,
+  ClipboardCheck, Send, CalendarDays, Users, Settings, MapPin,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import type { NavSection } from "@/components/layout/Sidebar";
@@ -31,6 +31,7 @@ const NAV: NavSection[] = [
     label: "Management",
     items: [
       { label: "Events",    href: "/admin/events",    icon: <CalendarDays size={16} />, permission: Permissions.EventsView },
+      { label: "Venues",    href: "/admin/venues",    icon: <MapPin size={16} />,       permission: Permissions.VenuesManage },
       { label: "Users",     href: "/admin/users",     icon: <Users size={16} />,        permission: Permissions.UsersView },
       { label: "Settings",  href: "/admin/settings",  icon: <Settings size={16} />,     permission: Permissions.RolesManage },
     ],

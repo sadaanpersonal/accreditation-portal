@@ -30,14 +30,15 @@ export function Modal({ open, onClose, title, children, maxWidth = "480px" }: Pr
         >
           <motion.div
             className="modal-box"
-            style={{ maxWidth }}
+            style={{ maxWidth, maxHeight: "calc(100vh - 40px)", display: "flex", flexDirection: "column" }}
             initial={{ opacity: 0, y: 20, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.96 }}
             transition={{ duration: 0.2 }}
           >
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: title ? 16 : 0 }}>
-              {title && <h2>{title}</h2>}
+            {/* Pinned header */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: title ? 16 : 0, flexShrink: 0 }}>
+              {title && <h2 style={{ marginBottom: 0 }}>{title}</h2>}
               <button
                 onClick={onClose}
                 style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 4, marginLeft: "auto" }}
@@ -45,7 +46,11 @@ export function Modal({ open, onClose, title, children, maxWidth = "480px" }: Pr
                 <X size={18} />
               </button>
             </div>
-            {children}
+
+            {/* Scrollable content */}
+            <div style={{ overflowY: "auto", flex: "1 1 auto", minHeight: 0, margin: "0 -6px", padding: "0 6px" }}>
+              {children}
+            </div>
           </motion.div>
         </motion.div>
       )}
