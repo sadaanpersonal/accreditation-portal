@@ -366,6 +366,8 @@ export interface PassDto {
   eventName:      string;
   nationality:    string;
   passportNumber: string;
+  invitedByName?: string;
+  invitedByEmail?: string;
 }
 
 export const passesApi = {

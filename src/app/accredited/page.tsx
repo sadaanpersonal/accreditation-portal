@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { QrCode, Download, Share2, Smartphone, Clock, AlertTriangle, CheckCircle, ShieldAlert, Loader, CreditCard, CalendarDays } from "lucide-react";
+import { QrCode, Download, Share2, Smartphone, Clock, AlertTriangle, CheckCircle, ShieldAlert, Loader, CreditCard, CalendarDays, UserCheck } from "lucide-react";
 import NextLink from "next/link";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
@@ -198,6 +198,19 @@ export default function AccreditedDashboard() {
                   <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>Accreditation ID</div>
                   <div style={{ fontSize: 11, fontWeight: 600, fontFamily: "var(--font-mono)", color: visuals.idColor }}>{pass.passNumber}</div>
                 </div>
+                {(pass.invitedByName || pass.invitedByEmail) && (
+                  <div style={{ gridColumn: "1 / -1", paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}>
+                      <UserCheck size={12} /> Invited By
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: "var(--text-primary)" }}>{pass.invitedByName || "—"}</div>
+                    {pass.invitedByEmail && (
+                      <a href={`mailto:${pass.invitedByEmail}`} style={{ fontSize: 12, color: visuals.accentColor, textDecoration: "none" }}>
+                        {pass.invitedByEmail}
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             </CardBody>
           </GlassCard>
