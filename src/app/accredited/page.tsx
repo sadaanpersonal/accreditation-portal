@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { QrCode, Download, Share2, Smartphone, Clock, AlertTriangle, CheckCircle, ShieldAlert, Loader } from "lucide-react";
+import { QrCode, Download, Share2, Smartphone, Clock, AlertTriangle, CheckCircle, ShieldAlert, Loader, CreditCard, CalendarDays } from "lucide-react";
 import NextLink from "next/link";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
@@ -84,7 +84,7 @@ export default function AccreditedDashboard() {
   if (passes.length === 0) {
     return (
       <div style={{ textAlign: "center", padding: "60px 24px", color: "var(--text-muted)" }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>🪪</div>
+        <CreditCard size={40} style={{ display: "block", margin: "0 auto 12px", color: "var(--text-muted)" }} />
         <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>No Passes Yet</h2>
         <p style={{ fontSize: 13 }}>Your accreditation passes will appear here once approved.</p>
       </div>
@@ -105,13 +105,13 @@ export default function AccreditedDashboard() {
       {/* Stats row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
         {[
-          { label: "Total Passes", value: passes.length,              color: "var(--gold)", icon: "🪪" },
-          { label: "Active",       value: activeCount,                 color: "#22C55E",     icon: "✅" },
-          { label: "Expired",      value: passes.length - activeCount, color: "#9CA3AF",     icon: "⏱" },
-          { label: "Events",       value: eventSet.size,               color: "#818CF8",     icon: "🏟" },
+          { label: "Total Passes", value: passes.length,              color: "var(--gold)", Icon: CreditCard },
+          { label: "Active",       value: activeCount,                 color: "#22C55E",     Icon: CheckCircle },
+          { label: "Expired",      value: passes.length - activeCount, color: "#9CA3AF",     Icon: Clock },
+          { label: "Events",       value: eventSet.size,               color: "#818CF8",     Icon: CalendarDays },
         ].map(s => (
           <div key={s.label} className="glass-card" style={{ padding: "14px 16px" }}>
-            <div style={{ fontSize: 18, marginBottom: 6 }}>{s.icon}</div>
+            <s.Icon size={18} color={s.color} style={{ marginBottom: 6 }} />
             <div style={{ fontSize: 24, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>{s.label}</div>
           </div>
