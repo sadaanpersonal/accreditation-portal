@@ -1,7 +1,7 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ChevronLeft, Loader, FileText, Copy, Eye, MapPin, MessageSquare, Pencil } from "lucide-react";
+import { ChevronLeft, Loader, FileText, Copy, Eye, MapPin, MessageSquare, Pencil, Ban } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
@@ -12,7 +12,9 @@ import { Modal } from "@/components/ui/Modal";
 import { DocumentViewerModal } from "@/components/shared/DocumentViewerModal";
 import { EditApplicationModal } from "@/components/shared/EditApplicationModal";
 import { VenueMap, VenueSelect } from "@/components/shared/VenueMap";
-import { requestsApi, pipelineApi, venuesApi, resolveFileUrl, type RequestDto, type VenueDto } from "@/lib/api";
+import { PassCard } from "@/components/shared/PassCard";
+import { requestsApi, pipelineApi, venuesApi, passesApi, passVerifyUrl, resolveFileUrl, type RequestDto, type VenueDto, type PassDto } from "@/lib/api";
+import { useAuth, Permissions } from "@/contexts/AuthContext";
 
 function toPipelineState(req: RequestDto): PipelineState {
   return {
@@ -56,6 +58,7 @@ function toDateInput(iso?: string | null): string {
 export default function AdminRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { hasPermission } = useAuth();
   const [req, setReq] = useState<RequestDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +73,12 @@ export default function AdminRequestDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [viewDoc, setViewDoc] = useState<{ url: string; fileName: string } | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+
+  // Cancel (revoke) a granted pass
+  const [cancelModal, setCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   // Zone-owner stage: pick a venue + zones from the managed venue library
   const [venues, setVenues] = useState<VenueDto[]>([]);
@@ -108,6 +117,17 @@ export default function AdminRequestDetailPage() {
       if (res.success && res.data) setVenues(res.data);
     });
   }, []);
+
+  // Once approved, a pass is granted. Fetch the full pass (the summary embedded
+  // in the request lacks the QR payload) so the admin sees the real scannable
+  // pass. Falls back to request data if the full fetch isn't available.
+  const [pass, setPass] = useState<PassDto | null>(null);
+
+  useEffect(() => {
+    const passId = req?.pass?.id;
+    if (!passId) { setPass(null); return; }
+    passesApi.get(passId).then(res => { if (res.success && res.data) setPass(res.data); });
+  }, [req?.pass?.id]);
 
   // Once the request and venue library are both loaded, pre-select the venue
   // (matched by stored name) and the zones whose labels were requested.
@@ -186,6 +206,31 @@ export default function AdminRequestDetailPage() {
   function handleReject()      { doReview("Rejected", rejectNote || undefined); }
   function handleRequestInfo() { if (infoNote.trim()) doReview("RequestedInfo", infoNote); }
 
+  async function handleCancelPass() {
+    const passId = pass?.id ?? req?.pass?.id;
+    if (!passId || cancelLoading) return;
+    setCancelLoading(true);
+    setCancelError(null);
+    try {
+      const reason = cancelReason.trim() || "Cancelled by administrator";
+      const res = await passesApi.revoke(passId, reason);
+      if (res.success) {
+        // Reflect the revoked state locally, then reload the request summary.
+        setPass(prev => prev ? { ...prev, isRevoked: true, revokedReason: reason } : prev);
+        setCancelModal(false);
+        setCancelReason("");
+        toast.success("Pass cancelled. The QR code now shows as revoked.");
+        load();
+      } else {
+        setCancelError(res.message ?? "Failed to cancel pass.");
+      }
+    } catch {
+      setCancelError("Failed to cancel pass.");
+    } finally {
+      setCancelLoading(false);
+    }
+  }
+
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 300, gap: 10, color: "var(--text-muted)" }}>
@@ -206,6 +251,42 @@ export default function AdminRequestDetailPage() {
   const isComplete   = req.currentStage >= 5 && !req.isRejected;
   const isTerminated = req.isRejected || isComplete;
   const zones = req.zoneAccess ? req.zoneAccess.split(",").map(z => z.trim()).filter(Boolean) : [];
+
+  // Props for the granted-pass card: prefer the full pass (accurate QR payload),
+  // otherwise fall back to the request + embedded pass summary.
+  const passView = pass ? {
+    name:       pass.applicantName,
+    passportNo: pass.passportNumber,
+    role:       pass.role,
+    event:      pass.eventName,
+    validUntil: fmtDate(pass.validTo),
+    zones:      pass.zoneAccess ? pass.zoneAccess.split(",").map(z => z.trim()).filter(Boolean) : ["General"],
+    accId:      pass.passNumber,
+    issuedDate: fmtDate(pass.issuedAt),
+    qrValue:    passVerifyUrl(pass.id),
+    revoked:    pass.isRevoked,
+    expired:    new Date(pass.validTo) < new Date(),
+  } : req.pass ? {
+    name:       req.fullName,
+    passportNo: req.passportNumber,
+    role:       req.role,
+    event:      req.eventName,
+    validUntil: fmtDate(req.pass.validTo),
+    zones:      zones.length ? zones : ["General"],
+    accId:      req.pass.passNumber,
+    issuedDate: fmtDate(req.pass.validFrom),
+    qrValue:    passVerifyUrl(req.pass.id),
+    revoked:    req.pass.isRevoked,
+    expired:    new Date(req.pass.validTo) < new Date(),
+  } : null;
+
+  // A pass can be cancelled only while it is still active — not already revoked
+  // and not past its validity window — and only by someone with revoke rights.
+  const passRevoked = pass?.isRevoked ?? req.pass?.isRevoked ?? false;
+  const passValidTo = pass?.validTo ?? req.pass?.validTo;
+  const passActive  = !!req.pass && !passRevoked && !!passValidTo && new Date(passValidTo) > new Date();
+  const canCancelPass = passActive && hasPermission(Permissions.PassesRevoke);
+  const passRevokedReason = pass?.revokedReason;
 
   const zoneContent = req.currentStage === 2 && !isTerminated && !req.isInfoRequested ? (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -420,30 +501,85 @@ export default function AdminRequestDetailPage() {
           )}
         </div>
 
-        {/* Sidebar: Pipeline */}
-        <GlassCard style={{ alignSelf: "flex-start" }}>
-          <CardHeader><h2 style={{ fontSize: 14, fontWeight: 600 }}>Approval Pipeline</h2></CardHeader>
-          <CardBody>
-            <ApprovalPipeline
-              state={toPipelineState(req)}
-              onApprove={!isTerminated && !req.isInfoRequested && !actionLoading ? handleApprove : undefined}
-              onReject={!isTerminated && !actionLoading ? () => setRejectModal(true) : undefined}
-              onRequestInfo={!isTerminated && !req.isInfoRequested && !actionLoading ? () => setInfoModal(true) : undefined}
-              processing={actionLoading}
-              zoneContent={zoneContent}
-            />
-            {actionLoading && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, justifyContent: "center", color: "var(--text-muted)", fontSize: 12 }}>
-                <Loader size={14} className="spin" /> Processing…
-              </div>
-            )}
-            {isComplete && (
-              <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: "var(--radius-sm)", background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)", fontSize: 12, color: "#22C55E", textAlign: "center" }}>
-                ✓ Accreditation fully approved
-              </div>
-            )}
-          </CardBody>
-        </GlassCard>
+        {/* Sidebar: Pipeline + granted pass */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20, alignSelf: "flex-start" }}>
+          <GlassCard>
+            <CardHeader><h2 style={{ fontSize: 14, fontWeight: 600 }}>Approval Pipeline</h2></CardHeader>
+            <CardBody>
+              <ApprovalPipeline
+                state={toPipelineState(req)}
+                onApprove={!isTerminated && !req.isInfoRequested && !actionLoading ? handleApprove : undefined}
+                onReject={!isTerminated && !actionLoading ? () => setRejectModal(true) : undefined}
+                onRequestInfo={!isTerminated && !req.isInfoRequested && !actionLoading ? () => setInfoModal(true) : undefined}
+                processing={actionLoading}
+                zoneContent={zoneContent}
+              />
+              {actionLoading && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, justifyContent: "center", color: "var(--text-muted)", fontSize: 12 }}>
+                  <Loader size={14} className="spin" /> Processing…
+                </div>
+              )}
+              {isComplete && (
+                <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: "var(--radius-sm)", background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)", fontSize: 12, color: "#22C55E", textAlign: "center" }}>
+                  ✓ Accreditation fully approved
+                </div>
+              )}
+            </CardBody>
+          </GlassCard>
+
+          {/* Granted Pass — shown once a pass has been issued */}
+          {req.pass && (
+            <GlassCard>
+              <CardHeader>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                  <h2 style={{ fontSize: 14, fontWeight: 600 }}>Granted Pass</h2>
+                  {req.pass.isRevoked && (
+                    <span className="badge badge-rejected" style={{ fontSize: 10 }}>Revoked</span>
+                  )}
+                </div>
+              </CardHeader>
+              <CardBody style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+                {passView ? (
+                  <PassCard
+                    name={passView.name}
+                    passportNo={passView.passportNo}
+                    role={passView.role}
+                    event={passView.event}
+                    validUntil={passView.validUntil}
+                    zones={passView.zones}
+                    accId={passView.accId}
+                    issuedDate={passView.issuedDate}
+                    qrValue={passView.qrValue}
+                    revoked={passView.revoked}
+                    expired={passView.expired}
+                    style={{ width: 290 }}
+                  />
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "24px 0", color: "var(--text-muted)", fontSize: 12 }}>
+                    <Loader size={14} className="spin" /> Loading pass…
+                  </div>
+                )}
+
+                {/* Cancel — only while the pass is still active */}
+                {canCancelPass && (
+                  <button
+                    className="btn btn-danger btn-sm btn-full"
+                    onClick={() => setCancelModal(true)}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                  >
+                    <Ban size={14} /> Cancel Pass
+                  </button>
+                )}
+
+                {passRevoked && (
+                  <div style={{ width: "100%", padding: "9px 12px", borderRadius: "var(--radius-sm)", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", fontSize: 11.5, color: "#EF4444", textAlign: "center" }}>
+                    This pass has been cancelled.{passRevokedReason ? ` ${passRevokedReason}` : ""}
+                  </div>
+                )}
+              </CardBody>
+            </GlassCard>
+          )}
+        </div>
       </div>
 
       {/* Request Info Modal */}
@@ -486,6 +622,29 @@ export default function AdminRequestDetailPage() {
           </button>
         </div>
         {actionError && <p style={{ color: "#EF4444", fontSize: 12, marginTop: 8 }}>{actionError}</p>}
+      </Modal>
+
+      {/* Cancel Pass Modal */}
+      <Modal open={cancelModal} onClose={() => { if (!cancelLoading) setCancelModal(false); }} title="Cancel Accreditation Pass">
+        <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 14, lineHeight: 1.6 }}>
+          This will immediately revoke the pass for <strong style={{ color: "var(--text-primary)" }}>{req.fullName}</strong>.
+          Its QR code will show as <strong style={{ color: "#EF4444" }}>cancelled</strong> at all entry points. This cannot be undone.
+        </p>
+        <label className="form-label">Reason (optional)</label>
+        <textarea
+          className="form-control"
+          style={{ minHeight: 80, resize: "vertical" }}
+          placeholder="e.g. Credentials reassigned, security concern…"
+          value={cancelReason}
+          onChange={e => setCancelReason(e.target.value)}
+        />
+        <div style={{ display: "flex", gap: 10, marginTop: 14, justifyContent: "flex-end" }}>
+          <button className="btn btn-secondary" onClick={() => setCancelModal(false)} disabled={cancelLoading}>Keep Pass</button>
+          <button className="btn btn-danger" onClick={handleCancelPass} disabled={cancelLoading} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {cancelLoading ? <Loader size={13} className="spin" /> : <Ban size={14} />} Cancel Pass
+          </button>
+        </div>
+        {cancelError && <p style={{ color: "#EF4444", fontSize: 12, marginTop: 8 }}>{cancelError}</p>}
       </Modal>
 
       {/* Document Viewer */}

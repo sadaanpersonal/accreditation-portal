@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Maximize2, Minimize2, Shield, MapPin, Calendar, CheckCircle, ChevronLeft, ChevronRight, Loader, AlertCircle } from "lucide-react";
 import { QRCode } from "@/components/shared/QRCode";
-import { passesApi, type PassDto } from "@/lib/api";
+import { passesApi, passVerifyUrl, type PassDto } from "@/lib/api";
 
 export default function QRPage() {
   return (
@@ -58,7 +58,7 @@ function QRPageContent() {
   );
 
   const pass = passes[activeIdx];
-  const qrSeed = pass.qrPayload || pass.passNumber;
+  const qrValue = passVerifyUrl(pass.id);
   const expired = new Date(pass.validTo) < new Date();
   const validToStr = new Date(pass.validTo).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   const zones = pass.zoneAccess ? [pass.zoneAccess] : ["General"];
@@ -90,7 +90,7 @@ function QRPageContent() {
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.25em", color: "#6B0F2B", textTransform: "uppercase" }}>Qatar Olympic Committee</div>
             <div style={{ fontSize: 9, color: "#9CA3AF", letterSpacing: "0.1em", marginTop: 2 }}>Official Accreditation QR Pass</div>
           </div>
-          <QRCode seed={qrSeed} size={260} fg="#0A0608" />
+          <QRCode value={qrValue} size={260} fg="#0A0608" />
           <div style={{ marginTop: 16, textAlign: "center", paddingBottom: 4 }}>
             <div style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 700, letterSpacing: "0.12em", color: "#6B0F2B", marginBottom: 8 }}>{pass.passNumber}</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: "#111", lineHeight: 1.2 }}>{pass.applicantName}</div>
@@ -163,7 +163,7 @@ function QRPageContent() {
                   { bottom: 8, left: 8, borderBottom: "3px solid #C9A84C", borderLeft: "3px solid #C9A84C" },
                   { bottom: 8, right: 8, borderBottom: "3px solid #C9A84C", borderRight: "3px solid #C9A84C" },
                 ].map((cs, i) => <div key={i} style={{ position: "absolute", width: 16, height: 16, borderRadius: 2, ...cs }} />)}
-                <QRCode seed={qrSeed} size={180} fg="#0A0608" />
+                <QRCode value={qrValue} size={180} fg="#0A0608" />
               </div>
 
               <div style={{ textAlign: "center", margin: "14px 0 18px" }}>

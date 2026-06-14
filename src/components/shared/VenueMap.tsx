@@ -1,4 +1,5 @@
 "use client";
+import { Select } from "@/components/ui/Select";
 import type { VenueDto, VenueZoneDto } from "@/lib/api";
 
 /* Venues and their zone layouts are managed by admins at /admin/venues and
@@ -134,11 +135,13 @@ interface SelectProps {
 
 export function VenueSelect({ venues, value, onChange, loading }: SelectProps) {
   return (
-    <select className="form-control" value={value} onChange={e => onChange(e.target.value)} disabled={loading}>
-      <option value="">{loading ? "Loading venues…" : "— Select venue —"}</option>
-      {venues.map(v => (
-        <option key={v.id} value={v.id}>{v.name}</option>
-      ))}
-    </select>
+    <Select
+      options={venues.map(v => ({ value: v.id, label: v.name }))}
+      value={value}
+      onChange={v => onChange(v)}
+      placeholder={loading ? "Loading venues…" : "— Select venue —"}
+      isDisabled={loading}
+      isSearchable
+    />
   );
 }

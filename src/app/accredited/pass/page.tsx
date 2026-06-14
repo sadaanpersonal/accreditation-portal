@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PassCard } from "@/components/shared/PassCard";
-import { passesApi, type PassDto } from "@/lib/api";
+import { passesApi, passVerifyUrl, type PassDto } from "@/lib/api";
 import { Loader, AlertCircle } from "lucide-react";
 
 export default function PassPage() {
@@ -72,8 +72,9 @@ export default function PassPage() {
                 zones={p.zoneAccess ? [p.zoneAccess] : ["General"]}
                 accId={p.passNumber}
                 issuedDate={new Date(p.issuedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                qrSeed={p.qrPayload ?? p.passNumber}
-                expired={p.isRevoked || expired}
+                qrValue={passVerifyUrl(p.id)}
+                revoked={p.isRevoked}
+                expired={expired}
                 style={{ width: 290 }}
               />
             </div>

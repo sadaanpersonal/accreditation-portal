@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, LogIn, AlertCircle, Loader, HelpCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { HowItWorksModal } from "@/components/shared/HowItWorksModal";
+import { AuthControls } from "@/components/shared/AuthControls";
 
 function LoginForm() {
   const { login } = useAuth();
@@ -147,6 +148,7 @@ export default function LoginPage() {
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     }>
+      <AuthControls />
       <LoginForm />
     </Suspense>
   );

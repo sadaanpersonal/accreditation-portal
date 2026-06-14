@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { Upload, FileText, Image as ImageIcon, X, Plus, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { DocumentViewerModal } from "@/components/shared/DocumentViewerModal";
+import { Select } from "@/components/ui/Select";
 
 export type DocType = "Passport" | "Photo" | "Supporting" | "Other";
 
@@ -105,6 +106,7 @@ export function DocumentUploader({ value, onChange }: Props) {
           border: "1.5px dashed var(--border-strong)", borderRadius: "var(--radius-sm)",
           padding: "28px 20px", textAlign: "center", cursor: "pointer",
           background: "var(--surface-3)", transition: "border-color 0.15s",
+          display: "flex", flexDirection: "column", alignItems: "center",
         }}
       >
         <input
@@ -158,14 +160,13 @@ export function DocumentUploader({ value, onChange }: Props) {
                 </div>
 
                 {/* Type selector */}
-                <select
-                  className="form-control"
-                  style={{ width: "auto", margin: 0, fontSize: 12, padding: "6px 8px" }}
+                <Select
+                  options={DOC_TYPES.map(t => ({ value: t, label: t }))}
                   value={doc.type}
-                  onChange={e => updateType(i, e.target.value as DocType)}
-                >
-                  {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                  onChange={v => updateType(i, v as DocType)}
+                  ariaLabel="Document type"
+                  width={150}
+                />
 
                 {/* View */}
                 <button

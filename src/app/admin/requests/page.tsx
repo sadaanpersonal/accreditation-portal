@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { RoleTag } from "@/components/ui/RoleTag";
 import { PipelineMini } from "@/components/ui/PipelineMini";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
+import { Select } from "@/components/ui/Select";
 import { requestsApi, type RequestDto } from "@/lib/api";
 
 type Variant = "approved" | "pending" | "rejected" | "review";
@@ -70,19 +71,32 @@ export default function AdminRequestsPage() {
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <Filter size={14} style={{ color: "var(--text-muted)" }} />
-              <select className="form-control" style={{ margin: 0, width: "auto" }} value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
-                <option value="all">All Status</option>
-                <option value="Submitted">Submitted</option>
-                <option value="UnderReview">Under Review</option>
-                <option value="InfoRequested">Info Requested</option>
-                <option value="Approved">Approved</option>
-                <option value="Rejected">Rejected</option>
-              </select>
+              <Select
+                options={[
+                  { value: "all", label: "All Status" },
+                  { value: "Submitted", label: "Submitted" },
+                  { value: "UnderReview", label: "Under Review" },
+                  { value: "InfoRequested", label: "Info Requested" },
+                  { value: "Approved", label: "Approved" },
+                  { value: "Rejected", label: "Rejected" },
+                ]}
+                value={statusFilter}
+                onChange={v => { setStatusFilter(v); setPage(1); }}
+                ariaLabel="Filter by status"
+                width={170}
+              />
               {events.length > 0 && (
-                <select className="form-control" style={{ margin: 0, width: "auto" }} value={eventFilter} onChange={e => { setEventFilter(e.target.value); setPage(1); }}>
-                  <option value="all">All Events</option>
-                  {events.map(ev => <option key={ev} value={ev}>{ev}</option>)}
-                </select>
+                <Select
+                  options={[
+                    { value: "all", label: "All Events" },
+                    ...events.map(ev => ({ value: ev, label: ev })),
+                  ]}
+                  value={eventFilter}
+                  onChange={v => { setEventFilter(v); setPage(1); }}
+                  ariaLabel="Filter by event"
+                  width={200}
+                  isSearchable
+                />
               )}
             </div>
           </div>
@@ -126,6 +140,8 @@ export default function AdminRequestsPage() {
                         rejected={r.isRejected}
                         rejectedAt={r.isRejected ? r.currentStage : undefined}
                         hasMoi
+                        showLabel
+                        labelBelow
                       />
                     </td>
                     <td><Badge variant={statusVariant(r)} /></td>

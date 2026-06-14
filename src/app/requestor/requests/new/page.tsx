@@ -7,6 +7,7 @@ import Link from "next/link";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
 import { VenueMap, VenueSelect } from "@/components/shared/VenueMap";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { Select } from "@/components/ui/Select";
 import { Stepper } from "@/components/ui/Stepper";
 import { DocumentUploader, type UploadedDoc } from "@/components/shared/DocumentUploader";
 import { requestsApi, eventsApi, venuesApi, type EventDto, type VenueDto } from "@/lib/api";
@@ -270,10 +271,13 @@ function NewRequestForm() {
               </div>
               <div className="form-group">
                 <label className="form-label">Nationality *</label>
-                <select className="form-control" value={form.nationality} onChange={e => set("nationality", e.target.value)}>
-                  <option value="">Select nationality</option>
-                  {NATIONALITIES.map(n => <option key={n}>{n}</option>)}
-                </select>
+                <Select
+                  options={NATIONALITIES.map(n => ({ value: n, label: n }))}
+                  value={form.nationality}
+                  onChange={v => set("nationality", v)}
+                  placeholder="Select nationality"
+                  isSearchable
+                />
                 {errors.nationality && <span style={{ fontSize: 11, color: "#F87171" }}>{errors.nationality}</span>}
               </div>
               <div className="form-group">
@@ -323,18 +327,23 @@ function NewRequestForm() {
             <div className="form-grid">
               <div className="form-group">
                 <label className="form-label">Role *</label>
-                <select className="form-control" value={form.role} onChange={e => set("role", e.target.value)}>
-                  <option value="">Select role</option>
-                  {ROLES.map(r => <option key={r}>{r}</option>)}
-                </select>
+                <Select
+                  options={ROLES.map(r => ({ value: r, label: r }))}
+                  value={form.role}
+                  onChange={v => set("role", v)}
+                  placeholder="Select role"
+                />
                 {errors.role && <span style={{ fontSize: 11, color: "#F87171" }}>{errors.role}</span>}
               </div>
               <div className="form-group">
                 <label className="form-label">Event *</label>
-                <select className="form-control" value={form.eventId} onChange={e => set("eventId", e.target.value)}>
-                  <option value="">Select event</option>
-                  {selectableEvents.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
-                </select>
+                <Select
+                  options={selectableEvents.map(ev => ({ value: ev.id, label: ev.name }))}
+                  value={form.eventId}
+                  onChange={v => set("eventId", v)}
+                  placeholder="Select event"
+                  isSearchable
+                />
                 {errors.eventId && <span style={{ fontSize: 11, color: "#F87171" }}>{errors.eventId}</span>}
               </div>
               <div className="form-group" style={{ gridColumn: "1 / -1" }}>

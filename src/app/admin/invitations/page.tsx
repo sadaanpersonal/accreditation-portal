@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Send, Copy, Check, Mail, Clock, CheckCircle2, XCircle, Loader, RefreshCw, Trash2 } from "lucide-react";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
+import { Select } from "@/components/ui/Select";
 import { invitationsApi, eventsApi, type InvitationDto, type EventDto } from "@/lib/api";
 
 const STATUS_STYLE = {
@@ -121,20 +122,27 @@ export default function InvitationsPage() {
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Role</label>
-              <select className="form-control" style={{ margin: 0 }} value={role} onChange={e => setRole(e.target.value)}>
-                <option value="REQUESTOR">Requestor</option>
-                <option value="FA_OWNER">FA Owner</option>
-                <option value="ZONE_OWNER">Zone Owner</option>
-                <option value="MEDIA_OWNER">Media Owner</option>
-                <option value="MOI_OFFICER">MOI Officer</option>
-              </select>
+              <Select
+                options={[
+                  { value: "REQUESTOR", label: "Requestor" },
+                  { value: "FA_OWNER", label: "FA Owner" },
+                  { value: "ZONE_OWNER", label: "Zone Owner" },
+                  { value: "MEDIA_OWNER", label: "Media Owner" },
+                  { value: "MOI_OFFICER", label: "MOI Officer" },
+                ]}
+                value={role}
+                onChange={v => setRole(v)}
+              />
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Event (optional)</label>
-              <select className="form-control" style={{ margin: 0 }} value={eventId} onChange={e => setEventId(e.target.value)}>
-                <option value="">— No specific event —</option>
-                {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
-              </select>
+              <Select
+                options={events.map(ev => ({ value: ev.id, label: ev.name }))}
+                value={eventId}
+                onChange={v => setEventId(v)}
+                placeholder="— No specific event —"
+                isSearchable
+              />
             </div>
             <button className="btn btn-primary btn-sm" style={{ display: "flex", alignItems: "center", gap: 6, alignSelf: "flex-end", height: 42 }} onClick={handleSend} disabled={!email.trim() || sending}>
               {sending ? <Loader size={13} style={{ animation: "spin 1s linear infinite" }} /> : <Send size={13} />}

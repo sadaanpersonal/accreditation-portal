@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { RoleTag } from "@/components/ui/RoleTag";
 import { PipelineMini } from "@/components/ui/PipelineMini";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
+import { Select } from "@/components/ui/Select";
 import { pipelineApi, type QueueItemDto } from "@/lib/api";
 
 const STAGE_LABELS: Record<number, string> = {
@@ -90,13 +91,19 @@ export default function AdminReviewQueuePage() {
               <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
               <input className="form-control" style={{ paddingLeft: 32, margin: 0 }} placeholder="Search applicant or event…" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
             </div>
-            <select className="form-control" style={{ margin: 0, width: "auto" }} value={stageFilter} onChange={e => { setStageFilter(e.target.value); setPage(1); }}>
-              <option value="all">All Stages</option>
-              <option value="1">Stage 1 — FA Owner</option>
-              <option value="2">Stage 2 — Zone Owner</option>
-              <option value="3">Stage 3 — Media Owner</option>
-              <option value="4">Stage 4 — MOI</option>
-            </select>
+            <Select
+              options={[
+                { value: "all", label: "All Stages" },
+                { value: "1", label: "Stage 1 — FA Owner" },
+                { value: "2", label: "Stage 2 — Zone Owner" },
+                { value: "3", label: "Stage 3 — Media Owner" },
+                { value: "4", label: "Stage 4 — MOI" },
+              ]}
+              value={stageFilter}
+              onChange={v => { setStageFilter(v); setPage(1); }}
+              ariaLabel="Filter by stage"
+              width={200}
+            />
           </div>
           <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>{loading ? "…" : `${items.length} results`}</span>
         </CardHeader>
@@ -141,7 +148,7 @@ export default function AdminReviewQueuePage() {
                         </span>
                       </td>
                       <td>
-                        <PipelineMini currentStage={r.stage} rejected={false} hasMoi />
+                        <PipelineMini currentStage={r.stage} rejected={false} hasMoi showLabel labelBelow />
                       </td>
                       <td style={{ fontSize: 11, color: "var(--text-muted)" }}>
                         {r.submittedAt ? new Date(r.submittedAt).toLocaleDateString() : "—"}

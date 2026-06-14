@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Loader, Check, FileText, ExternalLink } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { Select } from "@/components/ui/Select";
 import { DocumentUploader, type UploadedDoc } from "@/components/shared/DocumentUploader";
 import { requestsApi, resolveFileUrl, type RequestDto } from "@/lib/api";
 
@@ -141,10 +142,13 @@ export function EditApplicationModal({ open, request, onClose, onSaved }: Props)
             <input className="form-control" value={lastName} onChange={e => setLastName(e.target.value)} />
           </Field>
           <Field label="Nationality *" error={errors.nationality}>
-            <select className="form-control" value={nationality} onChange={e => setNationality(e.target.value)}>
-              <option value="">Select nationality</option>
-              {NATIONALITIES.map(n => <option key={n}>{n}</option>)}
-            </select>
+            <Select
+              options={NATIONALITIES.map(n => ({ value: n, label: n }))}
+              value={nationality}
+              onChange={v => setNationality(v)}
+              placeholder="Select nationality"
+              isSearchable
+            />
           </Field>
           <Field label="Passport Number *" error={errors.passportNo}>
             <input className="form-control" value={passportNo} onChange={e => setPassportNo(e.target.value)} />

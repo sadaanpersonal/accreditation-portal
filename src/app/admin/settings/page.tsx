@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
+import { Select } from "@/components/ui/Select";
 
 export default function AdminSettingsPage() {
   const [portal, setPortal] = useState({ name: "QOC Accreditation Portal", org: "Qatar Olympic Committee", email: "accreditation@qoc.qa", timezone: "Asia/Qatar" });
@@ -34,11 +35,15 @@ export default function AdminSettingsPage() {
             </div>
             <div className="form-group">
               <label className="form-label">Timezone</label>
-              <select className="form-control" value={portal.timezone} onChange={e => setPortal(p => ({ ...p, timezone: e.target.value }))}>
-                <option value="Asia/Qatar">Asia/Qatar (UTC+3)</option>
-                <option value="UTC">UTC</option>
-                <option value="Europe/London">Europe/London</option>
-              </select>
+              <Select
+                options={[
+                  { value: "Asia/Qatar", label: "Asia/Qatar (UTC+3)" },
+                  { value: "UTC", label: "UTC" },
+                  { value: "Europe/London", label: "Europe/London" },
+                ]}
+                value={portal.timezone}
+                onChange={v => setPortal(p => ({ ...p, timezone: v }))}
+              />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 4 }}>
               <button type="submit" className="btn btn-primary">Save Changes</button>

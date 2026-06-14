@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect, type ReactNode } from "react";
-import { X, Check, Calendar, MapPin, Shield, Palette, Tag, Loader, Pipette } from "lucide-react";
+import { X, Check, Calendar, Shield, Palette, Tag, Loader, Pipette } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { eventsApi, type EventDto } from "@/lib/api";
+import { eventsApi, venuesApi, type EventDto, type VenueDto } from "@/lib/api";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { Select } from "@/components/ui/Select";
 
 /** Today at 00:00 local — start dates may not be before this. */
 function startOfToday(): Date {
@@ -122,6 +123,13 @@ export function CreateEventModal({ open, onClose, onCreate, event }: Props) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [apiErr, setApiErr] = useState("");
+  const [venues, setVenues] = useState<VenueDto[]>([]);
+
+  // Load the managed venue library whenever the modal opens.
+  useEffect(() => {
+    if (!open) return;
+    venuesApi.list().then(res => { if (res.success && res.data) setVenues(res.data); });
+  }, [open]);
 
   // Initialise the form whenever the modal opens (prefill in edit mode, blank for create).
   useEffect(() => {
@@ -173,6 +181,16 @@ export function CreateEventModal({ open, onClose, onCreate, event }: Props) {
 
     setErrors(e);
     return Object.keys(e).length === 0;
+  }
+
+  // Venue dropdown options, built from the managed venue library. In edit mode
+  // an event may hold a free-text venue not in the library — keep it selectable.
+  const venueOptions = venues.map(v => ({
+    value: v.name,
+    label: v.location ? `${v.name} · ${v.location}` : v.name,
+  }));
+  if (form.venue && !venues.some(v => v.name === form.venue)) {
+    venueOptions.unshift({ value: form.venue, label: `${form.venue} (current)` });
   }
 
   // Resolved theme presentation + the hex value persisted on the event.
@@ -322,10 +340,22 @@ export function CreateEventModal({ open, onClose, onCreate, event }: Props) {
 
               {/* Venue */}
               <Field label="Venue" error={errors.venue}>
-                <div style={{ position: "relative" }}>
-                  <MapPin size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
-                  <input className="form-control" style={{ paddingLeft: 34 }} placeholder="e.g. Khalifa International Stadium" value={form.venue} onChange={e => setForm(f => ({ ...f, venue: e.target.value }))} />
-                </div>
+                <Select
+                  isSearchable
+                  placeholder={venues.length ? "Select a venue" : "No venues available"}
+                  options={venueOptions}
+                  value={form.venue}
+                  onChange={v => setForm(f => {
+                    const picked = venues.find(x => x.name === v);
+                    // Auto-fill the city/location from the chosen venue when empty.
+                    return { ...f, venue: v, location: !f.location && picked?.location ? picked.location : f.location };
+                  })}
+                />
+                {venues.length === 0 && (
+                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                    No venues yet — add one under Venues to choose it here.
+                  </span>
+                )}
               </Field>
 
               {/* Location (city) */}
@@ -344,11 +374,15 @@ export function CreateEventModal({ open, onClose, onCreate, event }: Props) {
               {/* Status + MOI row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <Field label="Status">
-                  <select className="form-control" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
-                    <option value="Draft">Upcoming (Draft)</option>
-                    <option value="Active">Active</option>
-                    <option value="Completed">Completed</option>
-                  </select>
+                  <Select
+                    options={[
+                      { value: "Draft", label: "Upcoming (Draft)" },
+                      { value: "Active", label: "Active" },
+                      { value: "Completed", label: "Completed" },
+                    ]}
+                    value={form.status}
+                    onChange={v => setForm(f => ({ ...f, status: v }))}
+                  />
                 </Field>
 
                 <Field label="MOI Required">

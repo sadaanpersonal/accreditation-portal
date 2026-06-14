@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Loader, Check } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { Select } from "@/components/ui/Select";
 import { usersApi, type UserDto, type RoleDto } from "@/lib/api";
 
 interface Props {
@@ -68,10 +69,15 @@ export function EditUserModal({ open, user, roles, onClose, onSaved }: Props) {
 
         {roles.length > 0 && (
           <Field label="Role">
-            <select className="form-control" value={roleId} onChange={e => setRoleId(e.target.value)}>
-              <option value="">No role</option>
-              {roles.map(r => <option key={r.id} value={r.id}>{roleLabel(r.code)}</option>)}
-            </select>
+            <Select
+              options={[
+                { value: "", label: "No role" },
+                ...roles.map(r => ({ value: r.id, label: roleLabel(r.code) })),
+              ]}
+              value={roleId}
+              onChange={v => setRoleId(v)}
+              isSearchable
+            />
           </Field>
         )}
 

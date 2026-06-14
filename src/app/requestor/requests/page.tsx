@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { RoleTag } from "@/components/ui/RoleTag";
 import { PipelineMini } from "@/components/ui/PipelineMini";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
+import { Select } from "@/components/ui/Select";
 import { requestsApi, type RequestDto } from "@/lib/api";
 
 type Variant = "approved" | "pending" | "rejected" | "review";
@@ -71,13 +72,19 @@ export default function RequestsPage() {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <Filter size={14} style={{ color: "var(--text-muted)" }} />
-              <select className="form-control" style={{ margin: 0, width: "auto" }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="review">Info Requested</option>
-              </select>
+              <Select
+                options={[
+                  { value: "all", label: "All Status" },
+                  { value: "pending", label: "Pending" },
+                  { value: "approved", label: "Approved" },
+                  { value: "rejected", label: "Rejected" },
+                  { value: "review", label: "Info Requested" },
+                ]}
+                value={statusFilter}
+                onChange={v => setStatusFilter(v)}
+                ariaLabel="Filter requests by status"
+                width={170}
+              />
             </div>
           </div>
           <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>{loading ? "…" : `${totalCount} total`}</span>
@@ -120,6 +127,8 @@ export default function RequestsPage() {
                         rejected={r.isRejected}
                         rejectedAt={r.isRejected ? r.currentStage : undefined}
                         hasMoi
+                        showLabel
+                        labelBelow
                       />
                     </td>
                     <td><Badge variant={statusVariant(r)} /></td>

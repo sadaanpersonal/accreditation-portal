@@ -584,6 +584,31 @@ export interface PassAccessCheckDto {
   hasAccount:      boolean;
 }
 
+export type PassStatus = "Valid" | "Expired" | "NotYetValid" | "Revoked";
+
+export interface PassVerifyDto {
+  holderName:      string;
+  role:            string;
+  eventName:       string;
+  venueName:       string;
+  zoneAccess:      string;
+  accreditationId: string;
+  passNumber:      string;
+  nationality:     string;
+  validFrom:       string;
+  validTo:         string;
+  issuedAt:        string;
+  status:          PassStatus;
+  isRevoked:       boolean;
+  revokedReason?:  string;
+}
+
+/** Public URL encoded into a pass's QR code. Scanning it opens the verify page. */
+export function passVerifyUrl(passId: string): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  return `${origin}/verify/${passId}`;
+}
+
 export const passAccessApi = {
   /** Validate the one-time token from the approval email. */
   check: (token: string) =>
@@ -595,5 +620,9 @@ export const passAccessApi = {
       method: "POST",
       body:   JSON.stringify({ token, firstName, lastName, password }),
     }),
+
+  /** Public pass verification by pass id (powers the QR-code landing page). */
+  verify: (id: string) =>
+    request<PassVerifyDto>(`${V1}/pass-access/verify/${id}`),
 };
 

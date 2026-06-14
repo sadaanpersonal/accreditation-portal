@@ -5,6 +5,7 @@ import { Search, UserPlus, Shield, ShieldCheck, User, Loader, RefreshCw, Users a
 import { toast } from "sonner";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Select } from "@/components/ui/Select";
 import { EditUserModal } from "@/components/shared/EditUserModal";
 import { usersApi, rolesApi, type UserDto, type RoleDto } from "@/lib/api";
 import { useAuth, Permissions } from "@/contexts/AuthContext";
@@ -182,10 +183,16 @@ export default function UsersPage() {
               <input className="form-control" style={{ paddingLeft: 32, margin: 0 }} placeholder="Search by name or email…" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
             </div>
             {!isAccredited && (
-              <select className="form-control" style={{ margin: 0, width: "auto" }} value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }}>
-                <option value="all">All Roles</option>
-                {roleOptions.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
-              </select>
+              <Select
+                width={170}
+                ariaLabel="Filter by role"
+                value={roleFilter}
+                onChange={v => { setRoleFilter(v); setPage(1); }}
+                options={[
+                  { value: "all", label: "All Roles" },
+                  ...roleOptions.map(r => ({ value: r, label: roleLabel(r) })),
+                ]}
+              />
             )}
           </div>
           <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>{loading ? "…" : `${users.length} shown`}</span>

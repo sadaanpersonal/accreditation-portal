@@ -12,18 +12,28 @@ interface Props {
   zones: string[];
   accId: string;
   issuedDate: string;
-  qrSeed: number | string;
+  /** The string encoded into the QR — the public pass verification URL. */
+  qrValue: string;
   style?: React.CSSProperties;
   roleStyle?: React.CSSProperties;
   expired?: boolean;
+  /** Pass was cancelled by an admin — shows "CANCELLED" instead of "EXPIRED". */
+  revoked?: boolean;
 }
 
-export function PassCard({ name, passportNo, role, event, validUntil, zones, accId, issuedDate, qrSeed, style, roleStyle, expired }: Props) {
+export function PassCard({ name, passportNo, role, event, validUntil, zones, accId, issuedDate, qrValue, style, roleStyle, expired, revoked }: Props) {
   const [flipped, setFlipped] = useState(false);
   const nameParts = name.split(" ");
   const displayName = nameParts.length > 2
     ? `${nameParts.slice(0, 2).join(" ")}\n${nameParts.slice(2).join(" ")}`
     : name;
+
+  // A cancelled pass takes visual priority over a merely-expired one.
+  const dim          = revoked || expired;
+  const overlayText  = revoked ? "CANCELLED" : "EXPIRED";
+  const overlayColor = revoked ? "#F87171" : "#9CA3AF";
+  const overlayBorder = revoked ? "rgba(248,113,113,0.6)" : "rgba(156,163,175,0.5)";
+  const validLabel   = revoked ? "Cancelled" : expired ? "Expired" : "Valid Until";
 
   return (
     <div className="pass-card-flip-wrapper" onClick={() => setFlipped(f => !f)}>
@@ -31,16 +41,16 @@ export function PassCard({ name, passportNo, role, event, validUntil, zones, acc
 
         {/* FRONT */}
         <div className="pass-card pass-card-face" style={{ margin: 0, ...style }}>
-          {expired && (
+          {dim && (
             <div style={{
               position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
               zIndex: 10, pointerEvents: "none",
             }}>
               <div style={{
-                background: "rgba(0,0,0,0.55)", border: "2px solid rgba(156,163,175,0.5)", color: "#9CA3AF",
+                background: "rgba(0,0,0,0.55)", border: `2px solid ${overlayBorder}`, color: overlayColor,
                 fontSize: 22, fontWeight: 800, letterSpacing: "0.2em", padding: "10px 28px",
                 borderRadius: 8, transform: "rotate(-15deg)", textTransform: "uppercase", backdropFilter: "blur(2px)",
-              }}>EXPIRED</div>
+              }}>{overlayText}</div>
             </div>
           )}
           <div className="pass-header">
@@ -55,34 +65,39 @@ export function PassCard({ name, passportNo, role, event, validUntil, zones, acc
             </div>
             <div className="pass-role-badge" style={roleStyle}>{role}</div>
           </div>
-          <div className="pass-body">
-            <div className="pass-info">
+          {/* Identity: holder name + QR side by side */}
+          <div className="pass-identity">
+            <div className="pass-identity-text">
               <div className="pass-name" style={{ whiteSpace: "pre-line" }}>{displayName}</div>
               <div className="pass-passport">PASSPORT: {passportNo}</div>
-              <div className="pass-details">
-                <div className="pass-details-row">
-                  <div className="pass-detail-item">
-                    <div className="label">Event</div>
-                    <div className="value">{event}</div>
-                  </div>
-                  <div className="pass-detail-item">
-                    <div className="label">{expired ? "Expired" : "Valid Until"}</div>
-                    <div className="value" style={expired ? { color: "#F87171" } : undefined}>{validUntil}</div>
-                  </div>
-                </div>
-                <div className="pass-detail-item">
-                  <div className="label">Zones</div>
-                  <div className="value" style={{ display: "flex", flexWrap: "wrap", gap: 3, alignItems: "center" }}>
-                    {zones.map(z => (
-                      <span key={z} className="pass-zone-chip" style={expired ? { opacity: 0.5 } : undefined}>{z}</span>
-                    ))}
-                  </div>
-                </div>
+            </div>
+            <div className="pass-qr" style={dim ? { opacity: 0.4 } : undefined}>
+              <div className="qr-svg-wrap" style={{ padding: 7, borderRadius: 8 }}>
+                <QRCode value={qrValue} size={66} />
               </div>
             </div>
-            <div className="pass-qr" style={expired ? { opacity: 0.4 } : undefined}>
-              <div className="qr-svg-wrap" style={{ padding: 8, borderRadius: 8 }}>
-                <QRCode seed={qrSeed} size={80} />
+          </div>
+
+          <div className="pass-divider" />
+
+          {/* Details span the full width for breathing room */}
+          <div className="pass-details">
+            <div className="pass-details-grid">
+              <div className="pass-detail-item">
+                <div className="label">Event</div>
+                <div className="value">{event}</div>
+              </div>
+              <div className="pass-detail-item">
+                <div className="label">{validLabel}</div>
+                <div className="value" style={dim ? { color: "#F87171" } : undefined}>{validUntil}</div>
+              </div>
+            </div>
+            <div className="pass-detail-item">
+              <div className="label">Zones</div>
+              <div className="value pass-zones">
+                {zones.map(z => (
+                  <span key={z} className="pass-zone-chip" style={dim ? { opacity: 0.5 } : undefined}>{z}</span>
+                ))}
               </div>
             </div>
           </div>
@@ -103,7 +118,7 @@ export function PassCard({ name, passportNo, role, event, validUntil, zones, acc
             </div>
             <div>
               <div style={{ background: "rgba(255,255,255,0.95)", padding: 7, borderRadius: 8, display: "inline-block" }}>
-                <QRCode seed={qrSeed} size={72} />
+                <QRCode value={qrValue} size={72} />
               </div>
               <div style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--gold)", letterSpacing: "0.06em", textAlign: "center", marginTop: 4 }}>{accId}</div>
             </div>
@@ -138,7 +153,7 @@ export function PassCard({ name, passportNo, role, event, validUntil, zones, acc
             </div>
             <div style={{ fontSize: 7.5, color: "rgba(255,255,255,0.35)", textAlign: "right", lineHeight: 1.5 }}>
               <div>Issued: {issuedDate}</div>
-              <div>{expired ? "Expired" : "Expires"}: {validUntil}</div>
+              <div>{revoked ? "Cancelled" : expired ? "Expired" : "Expires"}: {validUntil}</div>
             </div>
           </div>
 

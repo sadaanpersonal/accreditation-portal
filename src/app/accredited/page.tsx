@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { RoleTag } from "@/components/ui/RoleTag";
 import { PassCard } from "@/components/shared/PassCard";
 import { QRCode } from "@/components/shared/QRCode";
-import { passesApi, type PassDto } from "@/lib/api";
+import { passesApi, passVerifyUrl, type PassDto } from "@/lib/api";
 
 // ── Role-based visual styles ───────────────────────────────────────────────
 interface PassVisuals {
@@ -148,7 +148,8 @@ export default function AccreditedDashboard() {
             zones={zones}
             accId={pass.passNumber}
             issuedDate={formatDate(pass.issuedAt)}
-            qrSeed={pass.qrPayload}
+            qrValue={passVerifyUrl(pass.id)}
+            revoked={pass.isRevoked}
             expired={expired}
             style={visuals.passStyle}
             roleStyle={visuals.roleStyle}
@@ -235,7 +236,7 @@ export default function AccreditedDashboard() {
               <CardHeader><h3 style={{ fontSize: 14, fontWeight: 600 }}>QR Code</h3></CardHeader>
               <CardBody style={{ textAlign: "center" }}>
                 <div style={{ display: "inline-block", background: "#fff", padding: 12, borderRadius: 12, marginBottom: 14, boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
-                  <QRCode seed={pass.qrPayload} size={150} />
+                  <QRCode value={passVerifyUrl(pass.id)} size={150} />
                 </div>
                 <p style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 12 }}>Scan to verify at entry points</p>
                 <div style={{

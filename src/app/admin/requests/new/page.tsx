@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { Select } from "@/components/ui/Select";
 import { Stepper } from "@/components/ui/Stepper";
 import { DocumentUploader, type UploadedDoc } from "@/components/shared/DocumentUploader";
 import { VenueMap, VenueSelect } from "@/components/shared/VenueMap";
@@ -291,10 +292,13 @@ function AdminNewRequestForm() {
               </div>
               <div className="form-group">
                 <label className="form-label">Nationality *</label>
-                <select className="form-control" value={form.nationality} onChange={e => set("nationality", e.target.value)}>
-                  <option value="">Select nationality</option>
-                  {NATIONALITIES.map(n => <option key={n}>{n}</option>)}
-                </select>
+                <Select
+                  options={NATIONALITIES.map(n => ({ value: n, label: n }))}
+                  value={form.nationality}
+                  onChange={v => set("nationality", v)}
+                  placeholder="Select nationality"
+                  isSearchable
+                />
                 {errors.nationality && <span style={{ fontSize: 11, color: "#F87171" }}>{errors.nationality}</span>}
               </div>
               <div className="form-group">
@@ -345,20 +349,24 @@ function AdminNewRequestForm() {
             <div className="form-grid">
               <div className="form-group">
                 <label className="form-label">Role *</label>
-                <select className="form-control" value={form.role} onChange={e => set("role", e.target.value)}>
-                  <option value="">Select role</option>
-                  {ROLES.map(r => <option key={r}>{r}</option>)}
-                </select>
+                <Select
+                  options={ROLES.map(r => ({ value: r, label: r }))}
+                  value={form.role}
+                  onChange={v => set("role", v)}
+                  placeholder="Select role"
+                />
                 {errors.role && <span style={{ fontSize: 11, color: "#F87171" }}>{errors.role}</span>}
               </div>
               <div className="form-group">
                 <label className="form-label">Event *</label>
-                <select className="form-control" value={form.eventId} onChange={e => set("eventId", e.target.value)} disabled={evLoading}>
-                  <option value="">{evLoading ? "Loading events…" : "Select event"}</option>
-                  {selectableEvents.map(e => (
-                    <option key={e.id} value={e.id}>{e.name}</option>
-                  ))}
-                </select>
+                <Select
+                  options={selectableEvents.map(e => ({ value: e.id, label: e.name }))}
+                  value={form.eventId}
+                  onChange={v => set("eventId", v)}
+                  placeholder={evLoading ? "Loading events…" : "Select event"}
+                  isDisabled={evLoading}
+                  isSearchable
+                />
                 {errors.eventId && <span style={{ fontSize: 11, color: "#F87171" }}>{errors.eventId}</span>}
                 {!evLoading && selectableEvents.length === 0 && (
                   <p style={{ fontSize: 11, color: "#F59E0B", marginTop: 4 }}>No other active events available.</p>

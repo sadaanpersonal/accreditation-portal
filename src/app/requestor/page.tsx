@@ -139,6 +139,7 @@ export default function RequestorDashboard() {
                           rejected={r.isRejected}
                           rejectedAt={r.isRejected ? r.currentStage : undefined}
                           hasMoi
+                          showLabel
                         />
                       </td>
                       <td><Badge variant={statusVariant(r)} /></td>

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { EventCard, type EventCardData } from "@/components/shared/EventCard";
 import { CreateEventModal } from "@/components/shared/CreateEventModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Select } from "@/components/ui/Select";
 import { eventsApi, type EventDto } from "@/lib/api";
 import { useAuth, Permissions } from "@/contexts/AuthContext";
 
@@ -137,12 +138,18 @@ export default function AdminEventsPage() {
             ))}
           </div>
 
-          <select className="form-control" style={{ margin: 0, width: "auto", fontSize: 13 }} value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
-            <option value="all">All Status</option>
-            <option value="Active">Active</option>
-            <option value="Draft">Upcoming</option>
-            <option value="Completed">Completed</option>
-          </select>
+          <Select
+            options={[
+              { value: "all", label: "All Status" },
+              { value: "Active", label: "Active" },
+              { value: "Draft", label: "Upcoming" },
+              { value: "Completed", label: "Completed" },
+            ]}
+            value={statusFilter}
+            onChange={v => { setStatusFilter(v); setPage(1); }}
+            ariaLabel="Filter by status"
+            width={170}
+          />
 
           <button className="btn btn-secondary btn-sm" onClick={load} title="Refresh" style={{ padding: "6px 10px" }}>
             <RefreshCw size={14} />

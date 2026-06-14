@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Upload, CheckCircle, AlertCircle, Download, ChevronRight, Loader, XCircle } from "lucide-react";
 import { RoleTag } from "@/components/ui/RoleTag";
+import { Select } from "@/components/ui/Select";
 import { eventsApi, bulkUploadApi, type BulkUploadRow, type EventDto } from "@/lib/api";
 import * as XLSX from "xlsx";
 
@@ -199,17 +200,13 @@ export function BulkUpload() {
             <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6 }}>
               Event <span style={{ color: "#F87171" }}>*</span>
             </label>
-            <select
-              className="form-control"
-              style={{ margin: 0 }}
+            <Select
+              options={events.map(ev => ({ value: ev.id, label: ev.name }))}
               value={eventId}
-              onChange={e => setEventId(e.target.value)}
-            >
-              <option value="">Select an event…</option>
-              {events.map(ev => (
-                <option key={ev.id} value={ev.id}>{ev.name}</option>
-              ))}
-            </select>
+              onChange={v => setEventId(v)}
+              placeholder="Select an event…"
+              isSearchable
+            />
           </div>
 
           {/* Drop zone */}

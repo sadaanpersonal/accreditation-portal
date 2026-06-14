@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { passAccessApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { AuthControls } from "@/components/shared/AuthControls";
 
 // ── types ────────────────────────────────────────────────────────────────────
 type Mode = "loading" | "error" | "register" | "login" | "done-register" | "done-login";
@@ -351,6 +352,7 @@ export default function PassAccessPage() {
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     }>
+      <AuthControls />
       <PassAccessContent />
     </Suspense>
   );

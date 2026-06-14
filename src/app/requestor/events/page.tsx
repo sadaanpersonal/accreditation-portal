@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Search, Loader, RefreshCw, LayoutGrid, List } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { EventCard, type EventCardData } from "@/components/shared/EventCard";
+import { Select } from "@/components/ui/Select";
 import { eventsApi, type EventDto } from "@/lib/api";
 
 const CARD_COLORS  = [
@@ -152,17 +153,18 @@ export default function RequestorEventsPage() {
             onChange={e => setSearchInput(e.target.value)}
           />
         </div>
-        <select
-          className="form-control"
-          style={{ margin: 0, width: "auto" }}
+        <Select
+          options={[
+            { value: "all", label: "All Events" },
+            { value: "active", label: "Open" },
+            { value: "upcoming", label: "Upcoming" },
+            { value: "completed", label: "Closed" },
+          ]}
           value={filter}
-          onChange={e => { setFilter(e.target.value); setPage(1); }}
-        >
-          <option value="all">All Events</option>
-          <option value="active">Open</option>
-          <option value="upcoming">Upcoming</option>
-          <option value="completed">Closed</option>
-        </select>
+          onChange={v => { setFilter(v); setPage(1); }}
+          ariaLabel="Filter events by status"
+          width={170}
+        />
       </div>
 
       {/* Content */}
