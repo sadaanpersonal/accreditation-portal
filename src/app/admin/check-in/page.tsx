@@ -132,14 +132,18 @@ export default function CheckInPage() {
               : <button className="btn btn-primary btn-sm" onClick={startScan} style={{ display: "flex", alignItems: "center", gap: 6 }}><Camera size={14} /> Start camera</button>}
           </CardHeader>
           <CardBody>
-            <div id="qr-reader" style={{ width: "100%", borderRadius: 10, overflow: "hidden", minHeight: 220, background: "var(--surface-3)", display: scanning ? "block" : "flex", alignItems: "center", justifyContent: "center" }}>
-              {!scanning && (
+            {/* Placeholder is a SIBLING — never a child of #qr-reader, which the
+                scanner library owns and mutates directly (mixing React-managed
+                children there throws a removeChild error). */}
+            {!scanning && (
+              <div style={{ width: "100%", minHeight: 220, borderRadius: 10, background: "var(--surface-3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <div style={{ textAlign: "center", color: "var(--text-muted)", padding: 24 }}>
                   <ScanLine size={28} style={{ marginBottom: 8 }} />
                   <div style={{ fontSize: 13 }}>Camera is off. Press “Start camera”.</div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+            <div id="qr-reader" style={{ width: "100%", borderRadius: 10, overflow: "hidden", display: scanning ? "block" : "none" }} />
 
             {/* Manual fallback */}
             <form onSubmit={handleManual} style={{ display: "flex", gap: 8, marginTop: 12 }}>
