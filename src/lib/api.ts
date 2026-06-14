@@ -679,9 +679,19 @@ export interface DelegationDto {
   isActive:     boolean;
 }
 
+export interface DelegationUserOption {
+  id:       string;
+  name:     string;
+  roleName?: string | null;
+}
+
 export const delegationsApi = {
   list: () =>
     request<DelegationDto[]>(`${V1}/delegations`),
+
+  /** Users available to delegate to (gated by Delegations.Manage, not Users.View). */
+  candidates: () =>
+    request<DelegationUserOption[]>(`${V1}/delegations/candidates`),
 
   create: (body: { toUserId: string; stage: number; startsAt: string; endsAt: string; note?: string }) =>
     request<DelegationDto>(`${V1}/delegations`, { method: "POST", body: JSON.stringify(body) }),

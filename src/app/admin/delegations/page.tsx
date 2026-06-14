@@ -7,7 +7,7 @@ import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
 import { Select } from "@/components/ui/Select";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { delegationsApi, usersApi, type DelegationDto, type UserDto } from "@/lib/api";
+import { delegationsApi, type DelegationDto, type DelegationUserOption } from "@/lib/api";
 
 const STAGES = [
   { value: "1", label: "Stage 1 — FA Owner" },
@@ -23,7 +23,7 @@ function fmt(iso: string) {
 
 export default function DelegationsPage() {
   const [items, setItems]   = useState<DelegationDto[]>([]);
-  const [users, setUsers]   = useState<UserDto[]>([]);
+  const [users, setUsers]   = useState<DelegationUserOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]   = useState("");
 
@@ -48,8 +48,8 @@ export default function DelegationsPage() {
 
   useEffect(() => {
     load();
-    usersApi.list({ pageNumber: 1, pageSize: 200 }).then(res => {
-      if (res.success && res.data) setUsers(res.data.items);
+    delegationsApi.candidates().then(res => {
+      if (res.success && res.data) setUsers(res.data);
     });
   }, [load]);
 
@@ -83,7 +83,7 @@ export default function DelegationsPage() {
     else toast.error(res.message ?? "Failed to remove.");
   }
 
-  const userOptions = users.map(u => ({ value: u.id, label: `${u.fullName || u.email}${u.roleName ? ` · ${u.roleName}` : ""}` }));
+  const userOptions = users.map(u => ({ value: u.id, label: `${u.name}${u.roleName ? ` · ${u.roleName}` : ""}` }));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 960, margin: "0 auto" }}>
