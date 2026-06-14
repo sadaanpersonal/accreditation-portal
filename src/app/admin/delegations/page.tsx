@@ -8,6 +8,11 @@ import { Select } from "@/components/ui/Select";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { delegationsApi, type DelegationDto, type DelegationUserOption } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+
+const STAGE_BY_ROLE: Record<string, string> = {
+  FA_OWNER: "1", ZONE_OWNER: "2", MEDIA_OWNER: "3", MOI_OFFICER: "4",
+};
 
 const STAGES = [
   { value: "1", label: "Stage 1 — FA Owner" },
@@ -22,6 +27,10 @@ function fmt(iso: string) {
 }
 
 export default function DelegationsPage() {
+  const { user } = useAuth();
+  const isAdmin  = user?.roleCode === "SUPER_ADMIN";
+  const ownStage = STAGE_BY_ROLE[user?.roleCode ?? ""];
+
   const [items, setItems]   = useState<DelegationDto[]>([]);
   const [users, setUsers]   = useState<DelegationUserOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +61,11 @@ export default function DelegationsPage() {
       if (res.success && res.data) setUsers(res.data);
     });
   }, [load]);
+
+  // Reviewers can only delegate their own stage — lock it.
+  useEffect(() => {
+    if (!isAdmin && ownStage) setStage(ownStage);
+  }, [isAdmin, ownStage]);
 
   async function create() {
     setFormErr("");
@@ -106,7 +120,10 @@ export default function DelegationsPage() {
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Stage *</label>
-              <Select options={STAGES} value={stage} onChange={setStage} />
+              <Select options={STAGES} value={stage} onChange={setStage} isDisabled={!isAdmin && !!ownStage} />
+              {!isAdmin && !!ownStage && (
+                <span style={{ fontSize: 10, color: "var(--text-muted)" }}>You can only delegate your own stage.</span>
+              )}
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">From *</label>
