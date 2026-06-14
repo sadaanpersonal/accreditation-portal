@@ -458,6 +458,8 @@ export interface VenueZoneDto {
   y:            number;
   width:        number;
   height:       number;
+  capacity?:    number | null;
+  used?:        number;
 }
 
 export interface VenueDto {
@@ -518,6 +520,7 @@ export interface BulkUploadRow {
   role:          string;
   phone?:        string | null;
   organization?: string | null;
+  position?:     string | null;
   venue?:        string | null;
   isValid:       boolean;
   error?:        string | null;
@@ -624,5 +627,66 @@ export const passAccessApi = {
   /** Public pass verification by pass id (powers the QR-code landing page). */
   verify: (id: string) =>
     request<PassVerifyDto>(`${V1}/pass-access/verify/${id}`),
+};
+
+// ── Gate check-in ─────────────────────────────────────────────────────────────
+export interface CheckInResult {
+  allowed:    boolean;
+  status:     string;     // Valid | Expired | NotYetValid | Revoked
+  holderName: string;
+  role:       string;
+  eventName:  string;
+  zoneAccess: string;
+  direction:  string;
+  gate?:      string | null;
+  scannedAt:  string;
+  message?:   string | null;
+}
+
+export interface CheckInLogItem {
+  id:            string;
+  holderName:    string;
+  passNumber:    string;
+  direction:     string;
+  gate?:         string | null;
+  scannedAt:     string;
+  scannedByName?: string | null;
+}
+
+export const checkInApi = {
+  record: (passId: string, direction: "In" | "Out", gate?: string) =>
+    request<CheckInResult>(`${V1}/check-in`, {
+      method: "POST",
+      body:   JSON.stringify({ passId, direction, gate }),
+    }),
+
+  log: (params?: Record<string, string | number>) =>
+    request<PaginatedResponse<CheckInLogItem>>(`${V1}/check-in/log?${new URLSearchParams(params as Record<string, string> ?? {})}`),
+};
+
+// ── Reviewer delegation ───────────────────────────────────────────────────────
+export interface DelegationDto {
+  id:           string;
+  fromUserId:   string;
+  fromUserName: string;
+  toUserId:     string;
+  toUserName:   string;
+  stage:        number;
+  stageName:    string;
+  startsAt:     string;
+  endsAt:       string;
+  note?:        string | null;
+  isActive:     boolean;
+}
+
+export const delegationsApi = {
+  list: () =>
+    request<DelegationDto[]>(`${V1}/delegations`),
+
+  create: (body: { toUserId: string; stage: number; startsAt: string; endsAt: string; note?: string }) =>
+    request<DelegationDto>(`${V1}/delegations`, { method: "POST", body: JSON.stringify(body) }),
+
+  remove: (id: string) =>
+    request<boolean>(`${V1}/delegations/${id}`, { method: "DELETE" }),
 };
 

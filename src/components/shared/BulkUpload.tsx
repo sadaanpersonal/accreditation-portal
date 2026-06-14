@@ -13,12 +13,12 @@ const STEPS = ["Upload File", "Review & Validate", "Confirm & Submit"];
 const TEMPLATE_HEADERS = [
   "First Name", "Last Name", "Email", "Nationality",
   "Passport No", "Date Of Birth", "Role",
-  "Phone", "Organization", "Venue",
+  "Phone", "Organization", "Position", "Venue",
 ];
 const TEMPLATE_EXAMPLE = [
   "John", "Smith", "john@example.com", "Qatar",
   "QA1234567", "1990-01-15", "Media",
-  "", "", "",
+  "", "", "", "",
 ];
 
 function downloadTemplate(format: "csv" | "xlsx") {
@@ -254,6 +254,7 @@ export function BulkUpload() {
                 { col: "Role",          req: true  },
                 { col: "Phone",         req: false },
                 { col: "Organization",  req: false },
+                { col: "Position",      req: false },
                 { col: "Venue",         req: false },
               ].map(({ col, req }) => (
                 <div key={col} style={{ fontSize: 12, color: "var(--text-muted)", padding: "4px 8px", background: "var(--surface-3)", borderRadius: 4, border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>

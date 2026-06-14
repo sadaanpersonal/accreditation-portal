@@ -27,6 +27,7 @@ export interface DesignZone {
   y:           number;
   width:       number;
   height:      number;
+  capacity:    number | null;
 }
 
 type ResizeDir = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
@@ -80,6 +81,7 @@ export function VenueDesigner({ initial, saving, onSave, onCancel }: Props) {
       y:           z.y,
       width:       z.width,
       height:      z.height,
+      capacity:    z.capacity ?? null,
     })));
   }, [initial]);
 
@@ -110,6 +112,7 @@ export function VenueDesigner({ initial, saving, onSave, onCancel }: Props) {
       y:           snap(CANVAS_H / 2 - 30) + (zones.length % 4) * SNAP,
       width:       100,
       height:      60,
+      capacity:    null,
     };
     setZones(prev => [...prev, zone]);
     setSelectedUid(zone.uid);
@@ -225,6 +228,7 @@ export function VenueDesigner({ initial, saving, onSave, onCancel }: Props) {
         y:           Math.round(z.y * 10) / 10,
         width:       Math.round(z.width * 10) / 10,
         height:      Math.round(z.height * 10) / 10,
+        capacity:    z.capacity,
       })),
     });
   }
@@ -379,6 +383,22 @@ export function VenueDesigner({ initial, saving, onSave, onCancel }: Props) {
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">Description</label>
                     <input className="form-control" placeholder="e.g. Press & broadcast area" value={selected.description} onChange={e => updateZone(selected.uid, { description: e.target.value })} />
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Capacity</label>
+                    <input
+                      className="form-control"
+                      type="number"
+                      min={0}
+                      placeholder="Unlimited"
+                      value={selected.capacity ?? ""}
+                      onChange={e => {
+                        const v = e.target.value.trim();
+                        updateZone(selected.uid, { capacity: v === "" ? null : Math.max(0, Number(v)) });
+                      }}
+                    />
+                    <span style={{ fontSize: 10, color: "var(--text-muted)" }}>Max accreditations for this zone. Leave blank for unlimited.</span>
                   </div>
 
                   <div className="form-group" style={{ margin: 0 }}>

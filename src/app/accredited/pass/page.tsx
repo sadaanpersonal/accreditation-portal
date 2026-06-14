@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { PassCard } from "@/components/shared/PassCard";
 import { passesApi, passVerifyUrl, type PassDto } from "@/lib/api";
-import { Loader, AlertCircle } from "lucide-react";
+import { Loader, AlertCircle, Printer } from "lucide-react";
 
 export default function PassPage() {
   const [passes,  setPasses]  = useState<PassDto[]>([]);
@@ -50,9 +50,20 @@ export default function PassPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div>
-        <h1 style={{ fontSize: 20, fontWeight: 700 }}>My Accreditation Passes</h1>
-        <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Tap a pass to flip and view terms of use</p>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 700 }}>My Accreditation Passes</h1>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Tap a pass to flip and view terms of use</p>
+        </div>
+        {passes.length > 0 && (
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => window.open(`/print/passes?ids=${passes.map(p => p.id).join(",")}`, "_blank")}
+            style={{ display: "flex", alignItems: "center", gap: 6 }}
+          >
+            <Printer size={14} /> Print {passes.length > 1 ? "all" : "badge"}
+          </button>
+        )}
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 24 }}>

@@ -9,14 +9,12 @@ import { Select } from "@/components/ui/Select";
 import { Stepper } from "@/components/ui/Stepper";
 import { DocumentUploader, type UploadedDoc } from "@/components/shared/DocumentUploader";
 import { VenueMap, VenueSelect } from "@/components/shared/VenueMap";
+import { PhoneInput } from "@/components/ui/PhoneInput";
+import { isValidPhoneNumber } from "react-phone-number-input";
+import { COUNTRIES } from "@/lib/countries";
 import { eventsApi, requestsApi, venuesApi, type EventDto, type VenueDto } from "@/lib/api";
 
 const ROLES        = ["Athlete", "Media", "VIP", "Staff", "Official", "Coach"];
-const NATIONALITIES = [
-  "Qatar", "Saudi Arabia", "UAE", "Bahrain", "Kuwait", "Oman", "Jordan",
-  "Egypt", "Tunisia", "Morocco", "Algeria", "Libya", "Sudan", "Yemen",
-  "Palestine", "Syria", "Iraq", "Lebanon", "Other",
-];
 
 const STEPS = ["Applicant Info", "Event & Role", "Documents", "Review"];
 const CLONE_KEY = "qoc_clone_request";
@@ -53,7 +51,7 @@ const INITIAL_FORM: FormState = {
   role: "", eventId: "", assignedVenue: "", zoneAccess: "", notes: "",
 };
 
-type FieldErrors = Partial<Record<"firstName" | "lastName" | "nationality" | "passportNo" | "dob" | "email" | "role" | "eventId", string>>;
+type FieldErrors = Partial<Record<"firstName" | "lastName" | "nationality" | "passportNo" | "dob" | "email" | "phone" | "role" | "eventId", string>>;
 
 function fmtDate(iso?: string) {
   if (!iso) return "—";
@@ -154,8 +152,10 @@ function AdminNewRequestForm() {
       if (!form.lastName.trim())    e.lastName = "Last name is required.";
       if (!form.nationality)        e.nationality = "Please select a nationality.";
       if (!form.passportNo.trim())  e.passportNo = "Passport number is required.";
+      else if (!/^[A-Z0-9]{1,25}$/.test(form.passportNo.trim())) e.passportNo = "Capital letters and numbers only (max 25).";
       if (!form.email.trim())       e.email = "Email is required.";
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = "Enter a valid email address.";
+      if (form.phone && !isValidPhoneNumber(form.phone)) e.phone = "Enter a valid phone number.";
       if (!form.dob) {
         e.dob = "Date of birth is required.";
       } else {
@@ -293,7 +293,7 @@ function AdminNewRequestForm() {
               <div className="form-group">
                 <label className="form-label">Nationality *</label>
                 <Select
-                  options={NATIONALITIES.map(n => ({ value: n, label: n }))}
+                  options={COUNTRIES.map(n => ({ value: n, label: n }))}
                   value={form.nationality}
                   onChange={v => set("nationality", v)}
                   placeholder="Select nationality"
@@ -303,7 +303,7 @@ function AdminNewRequestForm() {
               </div>
               <div className="form-group">
                 <label className="form-label">Passport Number *</label>
-                <input className="form-control" placeholder="e.g. QA1234567" value={form.passportNo} onChange={e => set("passportNo", e.target.value)} />
+                <input className="form-control" placeholder="e.g. QA1234567" maxLength={25} value={form.passportNo} onChange={e => set("passportNo", e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 25))} />
                 {errors.passportNo && <span style={{ fontSize: 11, color: "#F87171" }}>{errors.passportNo}</span>}
               </div>
               <div className="form-group">
@@ -326,7 +326,8 @@ function AdminNewRequestForm() {
               </div>
               <div className="form-group">
                 <label className="form-label">Phone</label>
-                <input className="form-control" placeholder="Optional" value={form.phone} onChange={e => set("phone", e.target.value)} />
+                <PhoneInput value={form.phone} onChange={v => set("phone", v)} error={!!errors.phone} />
+                {errors.phone && <span style={{ fontSize: 11, color: "#F87171" }}>{errors.phone}</span>}
               </div>
               <div className="form-group">
                 <label className="form-label">Organization</label>

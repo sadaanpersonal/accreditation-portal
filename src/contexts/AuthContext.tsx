@@ -61,6 +61,8 @@ export const Permissions = {
   PassesRevoke:       "Passes.Revoke",
   InvitationsManage:  "Invitations.Manage",
   VenuesManage:       "Venues.Manage",
+  CheckInScan:        "CheckIn.Scan",
+  DelegationsManage:  "Delegations.Manage",
 } as const;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

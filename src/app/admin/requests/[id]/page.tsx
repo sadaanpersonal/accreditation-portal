@@ -1,7 +1,7 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ChevronLeft, Loader, FileText, Copy, Eye, MapPin, MessageSquare, Pencil, Ban } from "lucide-react";
+import { ChevronLeft, Loader, FileText, Copy, Eye, MapPin, MessageSquare, Pencil, Ban, Printer } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
@@ -559,6 +559,15 @@ export default function AdminRequestDetailPage() {
                     <Loader size={14} className="spin" /> Loading pass…
                   </div>
                 )}
+
+                {/* Print badge (opens the print-ready view in a new tab) */}
+                <button
+                  className="btn btn-secondary btn-sm btn-full"
+                  onClick={() => window.open(`/print/passes?ids=${req.pass!.id}`, "_blank")}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                >
+                  <Printer size={14} /> Print Badge
+                </button>
 
                 {/* Cancel — only while the pass is still active */}
                 {canCancelPass && (

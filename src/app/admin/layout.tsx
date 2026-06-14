@@ -2,7 +2,7 @@
 
 import {
   LayoutDashboard, PlusCircle, Upload, FolderOpen,
-  ClipboardCheck, Send, CalendarDays, Users, Settings, MapPin,
+  ClipboardCheck, Send, CalendarDays, Users, Settings, MapPin, BarChart3, ScanLine, UserCheck,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import type { NavSection } from "@/components/layout/Sidebar";
@@ -15,6 +15,7 @@ const NAV: NavSection[] = [
     label: "Overview",
     items: [
       { label: "Dashboard",    href: "/admin",              icon: <LayoutDashboard size={16} /> },
+      { label: "Analytics",    href: "/admin/analytics",    icon: <BarChart3 size={16} />,     permission: Permissions.RequestsViewAll },
     ],
   },
   {
@@ -24,7 +25,14 @@ const NAV: NavSection[] = [
       { label: "Bulk Upload",  href: "/admin/bulk-upload",  icon: <Upload size={16} />,        permission: Permissions.RequestsBulkUpload },
       { label: "All Requests", href: "/admin/requests",     icon: <FolderOpen size={16} />,    permission: Permissions.RequestsViewAll },
       { label: "Review Queue", href: "/admin/review",       icon: <ClipboardCheck size={16} />, permission: Permissions.RequestsReview },
+      { label: "Delegation",   href: "/admin/delegations",  icon: <UserCheck size={16} />,     permission: Permissions.DelegationsManage },
       { label: "Invitations",  href: "/admin/invitations",  icon: <Send size={16} />,          permission: Permissions.InvitationsManage },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { label: "Gate Check-In", href: "/admin/check-in",    icon: <ScanLine size={16} />,      permission: Permissions.CheckInScan },
     ],
   },
   {

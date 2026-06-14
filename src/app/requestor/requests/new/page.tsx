@@ -10,10 +10,12 @@ import { DatePicker } from "@/components/ui/DatePicker";
 import { Select } from "@/components/ui/Select";
 import { Stepper } from "@/components/ui/Stepper";
 import { DocumentUploader, type UploadedDoc } from "@/components/shared/DocumentUploader";
+import { PhoneInput } from "@/components/ui/PhoneInput";
+import { isValidPhoneNumber } from "react-phone-number-input";
+import { COUNTRIES } from "@/lib/countries";
 import { requestsApi, eventsApi, venuesApi, type EventDto, type VenueDto } from "@/lib/api";
 
 const ROLES = ["Athlete", "Media", "VIP", "Staff", "Official", "Coach"];
-const NATIONALITIES = ["Qatar", "Saudi Arabia", "UAE", "Bahrain", "Kuwait", "Oman", "Jordan", "Egypt", "Tunisia", "Morocco", "Other"];
 
 const STEPS = ["Applicant Info", "Event & Role", "Documents", "Review"];
 const CLONE_KEY = "qoc_clone_request";
@@ -27,7 +29,7 @@ interface CloneData {
   sourceEventId?: string; sourceEventName?: string;
 }
 
-type FieldErrors = Partial<Record<"firstName" | "lastName" | "nationality" | "passportNumber" | "dateOfBirth" | "role" | "eventId", string>>;
+type FieldErrors = Partial<Record<"firstName" | "lastName" | "nationality" | "passportNumber" | "dateOfBirth" | "phone" | "role" | "eventId", string>>;
 
 function fmtDate(iso?: string) {
   if (!iso) return "—";
@@ -132,6 +134,8 @@ function NewRequestForm() {
       if (!form.lastName.trim())       e.lastName = "Last name is required.";
       if (!form.nationality)           e.nationality = "Please select a nationality.";
       if (!form.passportNumber.trim()) e.passportNumber = "Passport number is required.";
+      else if (!/^[A-Z0-9]{1,25}$/.test(form.passportNumber.trim())) e.passportNumber = "Capital letters and numbers only (max 25).";
+      if (form.phone && !isValidPhoneNumber(form.phone)) e.phone = "Enter a valid phone number.";
       if (!form.dateOfBirth) {
         e.dateOfBirth = "Date of birth is required.";
       } else {
@@ -272,7 +276,7 @@ function NewRequestForm() {
               <div className="form-group">
                 <label className="form-label">Nationality *</label>
                 <Select
-                  options={NATIONALITIES.map(n => ({ value: n, label: n }))}
+                  options={COUNTRIES.map(n => ({ value: n, label: n }))}
                   value={form.nationality}
                   onChange={v => set("nationality", v)}
                   placeholder="Select nationality"
@@ -282,7 +286,7 @@ function NewRequestForm() {
               </div>
               <div className="form-group">
                 <label className="form-label">Passport Number *</label>
-                <input className="form-control" placeholder="e.g. QA1234567" value={form.passportNumber} onChange={e => set("passportNumber", e.target.value)} />
+                <input className="form-control" placeholder="e.g. QA1234567" maxLength={25} value={form.passportNumber} onChange={e => set("passportNumber", e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 25))} />
                 {errors.passportNumber && <span style={{ fontSize: 11, color: "#F87171" }}>{errors.passportNumber}</span>}
               </div>
               <div className="form-group">
@@ -304,7 +308,8 @@ function NewRequestForm() {
               </div>
               <div className="form-group">
                 <label className="form-label">Phone</label>
-                <input className="form-control" placeholder="Optional" value={form.phone} onChange={e => set("phone", e.target.value)} />
+                <PhoneInput value={form.phone} onChange={v => set("phone", v)} error={!!errors.phone} />
+                {errors.phone && <span style={{ fontSize: 11, color: "#F87171" }}>{errors.phone}</span>}
               </div>
               <div className="form-group">
                 <label className="form-label">Organization</label>
