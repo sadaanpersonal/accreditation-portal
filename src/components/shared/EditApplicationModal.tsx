@@ -5,13 +5,9 @@ import { Modal } from "@/components/ui/Modal";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { Select } from "@/components/ui/Select";
 import { DocumentUploader, type UploadedDoc } from "@/components/shared/DocumentUploader";
-import { requestsApi, resolveFileUrl, type RequestDto } from "@/lib/api";
-
-const NATIONALITIES = [
-  "Qatar", "Saudi Arabia", "UAE", "Bahrain", "Kuwait", "Oman", "Jordan",
-  "Egypt", "Tunisia", "Morocco", "Algeria", "Libya", "Sudan", "Yemen",
-  "Palestine", "Syria", "Iraq", "Lebanon", "Other",
-];
+import { VenueMap, VenueSelect } from "@/components/shared/VenueMap";
+import { COUNTRIES } from "@/lib/countries";
+import { requestsApi, venuesApi, resolveFileUrl, type RequestDto, type VenueDto } from "@/lib/api";
 
 const TODAY = new Date();
 const MIN_DOB = new Date(1900, 0, 1);
@@ -52,6 +48,12 @@ export function EditApplicationModal({ open, request, onClose, onSaved }: Props)
   const [saving,       setSaving]       = useState(false);
   const [errors,       setErrors]       = useState<Record<string, string>>({});
 
+  // Venue / zone assignment
+  const [venues,        setVenues]        = useState<VenueDto[]>([]);
+  const [venuesLoading, setVenuesLoading] = useState(true);
+  const [venueId,       setVenueId]       = useState("");
+  const [zoneIds,       setZoneIds]       = useState<string[]>([]);
+
   useEffect(() => {
     if (!open || !request) return;
     setFirstName(request.firstName ?? "");
@@ -68,7 +70,36 @@ export function EditApplicationModal({ open, request, onClose, onSaved }: Props)
     setErrors({});
   }, [open, request]);
 
+  // Load the managed venue library when the modal opens.
+  useEffect(() => {
+    if (!open) return;
+    venuesApi.list().then(res => {
+      setVenuesLoading(false);
+      if (res.success && res.data) setVenues(res.data);
+    });
+  }, [open]);
+
+  // Pre-select the venue (matched by stored name) and its requested zones.
+  useEffect(() => {
+    if (!open || !request || venues.length === 0) return;
+    const venueName = (request.assignedVenue ?? "").trim().toLowerCase();
+    const matched = venueName ? venues.find(v => v.name.trim().toLowerCase() === venueName) : null;
+    if (!matched) { setVenueId(""); setZoneIds([]); return; }
+    setVenueId(matched.id);
+    const requested = (request.zoneAccess ?? "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+    setZoneIds(matched.zones.filter((z, i) => requested.includes(z.label.trim().toLowerCase())).map((z, i) => z.id ?? `zone-${i}`));
+  }, [open, request, venues]);
+
   const infoRequested = !!request?.isInfoRequested;
+
+  const selectedVenue = venues.find(v => v.id === venueId) ?? null;
+  const selectedZoneLabels = selectedVenue
+    ? selectedVenue.zones.filter((z, i) => zoneIds.includes(z.id ?? `zone-${i}`)).map(z => z.label)
+    : [];
+
+  function toggleZone(zid: string) {
+    setZoneIds(prev => prev.includes(zid) ? prev.filter(z => z !== zid) : [...prev, zid]);
+  }
 
   function validate(): boolean {
     const e: Record<string, string> = {};
@@ -117,6 +148,10 @@ export function EditApplicationModal({ open, request, onClose, onSaved }: Props)
       phone:          phone.trim() || undefined,
       organization:   organization.trim() || undefined,
       position:       position.trim() || undefined,
+      // Venue/zone — only sent when a managed venue is selected, so a legacy
+      // free-text venue isn't wiped when none matches.
+      assignedVenue:  selectedVenue?.name,
+      zoneAccess:     selectedVenue ? selectedZoneLabels.join(", ") : undefined,
       // Clears the info-requested flag and returns the request to the pipeline.
       infoResponse:   infoRequested ? (responseNote.trim() || "Application details updated.") : undefined,
     });
@@ -143,7 +178,7 @@ export function EditApplicationModal({ open, request, onClose, onSaved }: Props)
           </Field>
           <Field label="Nationality *" error={errors.nationality}>
             <Select
-              options={NATIONALITIES.map(n => ({ value: n, label: n }))}
+              options={COUNTRIES.map(n => ({ value: n, label: n }))}
               value={nationality}
               onChange={v => setNationality(v)}
               placeholder="Select nationality"
@@ -168,6 +203,20 @@ export function EditApplicationModal({ open, request, onClose, onSaved }: Props)
           <Field label="Position / Title">
             <input className="form-control" value={position} onChange={e => setPosition(e.target.value)} />
           </Field>
+        </div>
+
+        {/* Venue & zone access */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-muted)" }}>Venue &amp; Zone Access</label>
+          <VenueSelect venues={venues} loading={venuesLoading} value={venueId} onChange={v => { setVenueId(v); setZoneIds([]); }} />
+          {selectedVenue && (
+            <>
+              <VenueMap venue={selectedVenue} selectedZones={zoneIds} onToggle={toggleZone} />
+              <p style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                {selectedZoneLabels.length ? `Selected: ${selectedZoneLabels.join(", ")}` : "Tap zones on the map to grant access."}
+              </p>
+            </>
+          )}
         </div>
 
         {/* Documents */}
