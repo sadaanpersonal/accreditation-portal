@@ -21,7 +21,8 @@ function toPipelineState(req: RequestDto): PipelineState {
   };
 }
 
-function pipelineVariant(req: RequestDto): "approved" | "pending" | "rejected" | "review" {
+function pipelineVariant(req: RequestDto): "approved" | "pending" | "rejected" | "review" | "cancelled" {
+  if (req.status === "Cancelled") return "cancelled";
   if (req.currentStage >= 5 && !req.isRejected) return "approved";
   if (req.isRejected) return "rejected";
   if (req.isInfoRequested) return "review";

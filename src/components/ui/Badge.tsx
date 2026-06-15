@@ -1,10 +1,11 @@
 import { cn } from "@/lib/utils";
 
-type Variant = "approved" | "pending" | "rejected" | "review" | "moi" | "completed";
+type Variant = "approved" | "pending" | "rejected" | "review" | "moi" | "completed" | "cancelled";
 
 const LABELS: Record<Variant, string> = {
   approved: "Approved", pending: "Pending", rejected: "Rejected",
   review: "In Review", moi: "MOI Clearance", completed: "Completed",
+  cancelled: "Cancelled",
 };
 
 interface Props {

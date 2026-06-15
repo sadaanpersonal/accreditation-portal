@@ -14,11 +14,12 @@ import { ExportButton } from "@/components/ui/ExportButton";
 import { useAuth, Permissions } from "@/contexts/AuthContext";
 import { requestsApi, pipelineApi, type RequestDto } from "@/lib/api";
 
-type Variant = "approved" | "pending" | "rejected" | "review";
+type Variant = "approved" | "pending" | "rejected" | "review" | "cancelled";
 
 const STAGE_NAMES = ["FA Owner", "Zone Owner", "Media Owner", "MOI"];
 
 function statusVariant(r: RequestDto): Variant {
+  if (r.status === "Cancelled") return "cancelled";
   if (r.status === "Approved") return "approved";
   if (r.status === "Rejected" || r.isRejected) return "rejected";
   if (r.isInfoRequested) return "review";

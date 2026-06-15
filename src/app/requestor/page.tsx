@@ -8,7 +8,8 @@ import { RoleTag } from "@/components/ui/RoleTag";
 import { PipelineMini } from "@/components/ui/PipelineMini";
 import { requestsApi, type RequestDto } from "@/lib/api";
 
-function statusVariant(r: RequestDto): "approved" | "pending" | "rejected" | "review" {
+function statusVariant(r: RequestDto): "approved" | "pending" | "rejected" | "review" | "cancelled" {
+  if (r.status === "Cancelled") return "cancelled";
   if (r.status === "Approved") return "approved";
   if (r.isRejected || r.status === "Rejected") return "rejected";
   if (r.isInfoRequested || r.status === "InfoRequested") return "review";

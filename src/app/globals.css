@@ -323,6 +323,7 @@ body {
 .badge-review   { background: rgba(96,165,250,0.1); color: #60A5FA; border: 1px solid rgba(96,165,250,0.25); }
 .badge-moi      { background: rgba(167,139,250,0.1); color: #A78BFA; border: 1px solid rgba(167,139,250,0.25); }
 .badge-completed { background: rgba(107,114,128,0.1); color: #9CA3AF; border: 1px solid rgba(107,114,128,0.25); }
+.badge-cancelled { background: rgba(107,114,128,0.12); color: #9CA3AF; border: 1px solid rgba(107,114,128,0.3); text-decoration: line-through; }
 
 /* ── Role Tags ──────────────────────────────────────────────── */
 .role-tag {

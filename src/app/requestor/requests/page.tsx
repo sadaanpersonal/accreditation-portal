@@ -10,9 +10,10 @@ import { GlassCard, CardHeader, CardBody } from "@/components/ui/GlassCard";
 import { Select } from "@/components/ui/Select";
 import { requestsApi, type RequestDto } from "@/lib/api";
 
-type Variant = "approved" | "pending" | "rejected" | "review";
+type Variant = "approved" | "pending" | "rejected" | "review" | "cancelled";
 
 function statusVariant(r: RequestDto): Variant {
+  if (r.status === "Cancelled") return "cancelled";
   if (r.status === "Approved") return "approved";
   if (r.status === "Rejected" || r.isRejected) return "rejected";
   if (r.isInfoRequested) return "review";

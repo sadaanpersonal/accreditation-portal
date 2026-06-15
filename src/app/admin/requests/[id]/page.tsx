@@ -25,7 +25,8 @@ function toPipelineState(req: RequestDto): PipelineState {
   };
 }
 
-function pipelineVariant(req: RequestDto): "approved" | "pending" | "rejected" | "review" {
+function pipelineVariant(req: RequestDto): "approved" | "pending" | "rejected" | "review" | "cancelled" {
+  if (req.status === "Cancelled") return "cancelled";
   if (req.currentStage >= 5 && !req.isRejected) return "approved";
   if (req.isRejected) return "rejected";
   if (req.isInfoRequested) return "review";
@@ -248,8 +249,9 @@ export default function AdminRequestDetailPage() {
     );
   }
 
-  const isComplete   = req.currentStage >= 5 && !req.isRejected;
-  const isTerminated = req.isRejected || isComplete;
+  const isCancelled  = req.status === "Cancelled";
+  const isComplete   = req.currentStage >= 5 && !req.isRejected && !isCancelled;
+  const isTerminated = req.isRejected || isCancelled || isComplete;
   const zones = req.zoneAccess ? req.zoneAccess.split(",").map(z => z.trim()).filter(Boolean) : [];
 
   // Props for the granted-pass card: prefer the full pass (accurate QR payload),
